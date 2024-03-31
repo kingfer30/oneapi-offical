@@ -3,6 +3,7 @@ package image
 import (
 	"bytes"
 	"encoding/base64"
+	"fmt"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/songquanpeng/one-api/common/logger"
 	_ "golang.org/x/image/webp"
 )
 
@@ -46,13 +48,63 @@ func GetImageSizeFromUrl(url string) (width int, height int, err error) {
 	return img.Width, img.Height, nil
 }
 
+func getImageFormat(input string) (string, string, error) {
+	if strings.HasPrefix(input, "http") || strings.HasPrefix(input, "https") {
+		//url no check
+		return "", "", nil
+	}
+	if strings.HasPrefix(input, "data:image/png;base64,") {
+		input = strings.TrimPrefix(input, "data:image/png;base64,")
+	} else if strings.HasPrefix(input, "data:image/jpeg;base64,") {
+		input = strings.TrimPrefix(input, "data:image/jpeg;base64,")
+	} else if strings.HasPrefix(input, "data:image/jpg;base64,") {
+		input = strings.TrimPrefix(input, "data:image/jpg;base64,")
+	} else if strings.HasPrefix(input, "data:image/webp;base64,") {
+		input = strings.TrimPrefix(input, "data:image/webp;base64,")
+	} else if strings.HasPrefix(input, "data:image/gif;base64,") {
+		input = strings.TrimPrefix(input, "data:image/gif;base64,")
+	}
+
+	var imageData []byte
+	var err error
+	imageData, err = base64.StdEncoding.DecodeString(input)
+	if err != nil {
+		logger.SysLog(fmt.Sprintf("Vision-Base64方式-DecodeString报错: %s", err.Error()))
+		return "", "", err
+	}
+
+	// 如果图像数据小于512字节，使用实际长度的数据。
+	dataToCheck := imageData
+	if len(imageData) > 512 {
+		dataToCheck = imageData[:512]
+	}
+
+	contentType := http.DetectContentType(dataToCheck)
+
+	switch contentType {
+	case "image/jpeg":
+		return "jpeg", input, nil
+	case "image/png":
+		return "png", input, nil
+	case "image/webp":
+		return "webp", input, nil
+	case "image/gif":
+		return "gif", input, nil
+	default:
+		return "", "", fmt.Errorf("unsupported image format: %s", contentType)
+	}
+}
+
 func GetImageFromUrl(url string) (mimeType string, data string, err error) {
-	// Check if the URL is a data URL
-	matches := dataURLPattern.FindStringSubmatch(url)
-	if len(matches) == 3 {
+	// Check if the URL is a base64
+	logger.SysLog("Vision-Base64 Checking...")
+	imgType, imgData, err := getImageFormat(url)
+
+	if err == nil {
 		// URL is a data URL
-		mimeType = "image/" + matches[1]
-		data = matches[2]
+		logger.SysLog(fmt.Sprintf("Vision-Base64 Ture ! %s",imgType))
+		mimeType = "image/" + imgType
+		data = imgData
 		return
 	}
 
