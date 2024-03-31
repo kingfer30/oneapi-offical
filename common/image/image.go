@@ -16,7 +16,7 @@ import (
 )
 
 // Regex to match data URL pattern
-var	dataURLPattern = regexp.MustCompile(`data:image/([^;]+);base64,(.*)`)
+var dataURLPattern = regexp.MustCompile(`data:image/([^;]+);base64,(.*)`)
 
 func IsImageUrl(url string) (bool, error) {
 	resp, err := http.Head(url)
@@ -104,8 +104,8 @@ func GetImageSizeFromBase64(encoded string) (width int, height int, err error) {
 }
 
 func GetImageSize(image string) (width int, height int, err error) {
-	if strings.HasPrefix(image, "data:image/") {
-		return GetImageSizeFromBase64(image)
+	if strings.HasPrefix(image, "http") || strings.HasPrefix(image, "https") {
+		return GetImageSizeFromUrl(image)
 	}
-	return GetImageSizeFromUrl(image)
+	return GetImageSizeFromBase64(image)
 }
