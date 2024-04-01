@@ -61,7 +61,6 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *ChatRequest {
 			},
 		}
 	}
-	shouldAddDummyModelMessage := false
 	nextRole := "user"
 	for k, message := range textRequest.Messages {
 		content := ChatContent{
