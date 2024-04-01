@@ -4,6 +4,10 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
+
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
@@ -12,9 +16,6 @@ import (
 	"github.com/songquanpeng/one-api/relay/channel/openai"
 	"github.com/songquanpeng/one-api/relay/constant"
 	"github.com/songquanpeng/one-api/relay/model"
-	"io"
-	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -61,7 +62,8 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *ChatRequest {
 		}
 	}
 	shouldAddDummyModelMessage := false
-	for _, message := range textRequest.Messages {
+	nextRole := "user"
+	for k, message := range textRequest.Messages {
 		content := ChatContent{
 			Role: message.Role,
 			Parts: []Part{
@@ -94,28 +96,53 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *ChatRequest {
 		}
 		content.Parts = parts
 
+		// there's cannt start with assistant role
+		if content.Role == "assistant" && k == 0 {
+			geminiRequest.Contents = append(geminiRequest.Contents, ChatContent{
+				Role: "user",
+				Parts: []Part{
+					{
+						Text: "Hello",
+					},
+				},
+			})
+			nextRole = "model"
+		}
+
 		// there's no assistant role in gemini and API shall vomit if Role is not user or model
-		if content.Role == "assistant" {
+		if content.Role == "assistant" || content.Role == "system" {
 			content.Role = "model"
 		}
-		// Converting system prompt to prompt from user for the same reason
-		if content.Role == "system" {
-			content.Role = "user"
-			shouldAddDummyModelMessage = true
-		}
-		geminiRequest.Contents = append(geminiRequest.Contents, content)
 
-		// If a system message is the last message, we need to add a dummy model message to make gemini happy
-		if shouldAddDummyModelMessage {
+		// per chat need gemini-user
+		if (content.Role == "model" || content.Role == "system" || content.Role == "assistant") && nextRole == "user" {
+			geminiRequest.Contents = append(geminiRequest.Contents, ChatContent{
+				Role: "user",
+				Parts: []Part{
+					{
+						Text: "Hello",
+					},
+				},
+			})
+			nextRole = "model"
+		} else if content.Role == "user" && nextRole == "model" {
 			geminiRequest.Contents = append(geminiRequest.Contents, ChatContent{
 				Role: "model",
 				Parts: []Part{
 					{
-						Text: "Okay",
+						Text: "OK, I have remembered the problem you described",
 					},
 				},
 			})
-			shouldAddDummyModelMessage = false
+			nextRole = "user"
+		}
+
+		geminiRequest.Contents = append(geminiRequest.Contents, content)
+
+		if content.Role == "user" {
+			nextRole = "model"
+		} else {
+			nextRole = "user"
 		}
 	}
 
