@@ -63,6 +63,7 @@ func getImageFormat(input string) (string, string, error) {
 	} else if strings.HasPrefix(input, "data:image/gif;base64,") {
 		input = strings.TrimPrefix(input, "data:image/gif;base64,")
 	}
+	input = strings.TrimSpace(input)
 
 	var imageData []byte
 	var err error
