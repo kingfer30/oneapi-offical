@@ -14,11 +14,10 @@ import (
 	"sync"
 
 	"github.com/songquanpeng/one-api/common/logger"
-	_ "golang.org/x/image/webp"
+	_ "golang.org/x/image/bmp"  // 导入BMP编解码器
+	_ "golang.org/x/image/tiff" // 导入TIFF编解码器
+	_ "golang.org/x/image/webp" // 导入WebP编解码器
 )
-
-// Regex to match data URL pattern
-var dataURLPattern = regexp.MustCompile(`data:image/([^;]+);base64,(.*)`)
 
 func IsImageUrl(url string) (bool, error) {
 	resp, err := http.Head(url)
@@ -69,7 +68,7 @@ func getImageFormat(input string) (string, string, error) {
 	var err error
 	imageData, err = base64.StdEncoding.DecodeString(input)
 	if err != nil {
-		logger.SysLog(fmt.Sprintf("Vision-Base64方式-DecodeString报错: %s", err.Error()))
+		logger.SysLog(fmt.Sprintf("Vision-Base64方式-DecodeString报错: %s->%s", input, err.Error()))
 		return "", "", err
 	}
 
@@ -97,17 +96,17 @@ func getImageFormat(input string) (string, string, error) {
 
 func GetImageFromUrl(url string) (mimeType string, data string, err error) {
 	// Check if the URL is a base64
-	logger.SysLog("Vision-Base64 Checking...")
+	logger.SysLog("Vision-Image-Format Checking...")
 	imgType, imgData, err := getImageFormat(url)
 
 	if err == nil && imgType != "" {
 		// URL is a data URL
-		logger.SysLog(fmt.Sprintf("Vision-Base64 Ture ! %s", imgType))
+		logger.SysLog(fmt.Sprintf("Vision-Base64 Yes ! %s", imgType))
 		mimeType = "image/" + imgType
 		data = imgData
 		return
 	}
-
+	logger.SysLog(fmt.Sprintf("Vision-Url Yes ! %s", url))
 	isImage, err := IsImageUrl(url)
 	if !isImage {
 		return
