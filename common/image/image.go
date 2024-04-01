@@ -100,9 +100,9 @@ func GetImageFromUrl(url string) (mimeType string, data string, err error) {
 	logger.SysLog("Vision-Base64 Checking...")
 	imgType, imgData, err := getImageFormat(url)
 
-	if err == nil {
+	if err == nil && imgType != "" {
 		// URL is a data URL
-		logger.SysLog(fmt.Sprintf("Vision-Base64 Ture ! %s",imgType))
+		logger.SysLog(fmt.Sprintf("Vision-Base64 Ture ! %s", imgType))
 		mimeType = "image/" + imgType
 		data = imgData
 		return
