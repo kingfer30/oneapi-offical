@@ -52,6 +52,7 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *ChatRequest {
 			Temperature:     textRequest.Temperature,
 			TopP:            textRequest.TopP,
 			MaxOutputTokens: textRequest.MaxTokens,
+			StopSequences:   textRequest.Stop,
 		},
 	}
 	if textRequest.Functions != nil {
