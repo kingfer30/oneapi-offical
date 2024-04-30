@@ -13,6 +13,7 @@ const COPY_OPTIONS = [
 ];
 
 const OPEN_LINK_OPTIONS = [
+  { key: 'next', text: 'ChatGPT Next Web', value: 'next' },
   { key: 'ama', text: 'BotGem', value: 'ama' },
   { key: 'opencat', text: 'OpenCat', value: 'opencat' },
 ];
@@ -99,7 +100,7 @@ const TokensTable = () => {
     if (nextLink) {
       nextUrl = nextLink + `/#/?settings={"key":"sk-${key}","url":"${serverAddress}"}`;
     } else {
-      nextUrl = `https://chat.oneapi.pro/#/?settings={"key":"sk-${key}","url":"${serverAddress}"}`;
+      nextUrl = `https://app.nextchat.dev/#/?settings={"key":"sk-${key}","url":"${serverAddress}"}`;
     }
 
     let url;
@@ -141,7 +142,7 @@ const TokensTable = () => {
     if (chatLink) {
       defaultUrl = chatLink + `/#/?settings={"key":"sk-${key}","url":"${serverAddress}"}`;
     } else {
-      defaultUrl = `https://chat.oneapi.pro/#/?settings={"key":"sk-${key}","url":"${serverAddress}"}`;
+      defaultUrl = `https://app.nextchat.dev/#/?settings={"key":"sk-${key}","url":"${serverAddress}"}`;
     }
     let url;
     switch (type) {
