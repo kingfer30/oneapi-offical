@@ -130,7 +130,7 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *ChatRequest {
 				Role: "user",
 				Parts: []Part{
 					{
-						Text: "Hello",
+						Text: "Please remember what i said",
 					},
 				},
 			})
@@ -154,6 +154,16 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *ChatRequest {
 		} else {
 			nextRole = "user"
 		}
+	}
+	if nextRole == "user" {
+		geminiRequest.Contents = append(geminiRequest.Contents, ChatContent{
+			Role: "user",
+			Parts: []Part{
+				{
+					Text: "Please remember what i said",
+				},
+			},
+		})
 	}
 
 	return &geminiRequest
