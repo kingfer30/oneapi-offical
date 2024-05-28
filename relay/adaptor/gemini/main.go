@@ -75,6 +75,12 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *ChatRequest {
 	}
 	nextRole := "user"
 	for k, message := range textRequest.Messages {
+		if message.StringContent() == "" {
+			b, jerr := json.Marshal(textRequest)
+			if jerr == nil {
+				logger.SysLog(fmt.Sprintf("Gemini-Text-Empty: %s", string(b)))
+			}
+		}
 		content := ChatContent{
 			Role: message.Role,
 			Parts: []Part{
