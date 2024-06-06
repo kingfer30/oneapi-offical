@@ -120,10 +120,10 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *Request {
 		}
 		claudeRequest.Messages = append(claudeRequest.Messages, claudeMessage)
 	}
-	b, jerr := json.Marshal(textRequest)
-	if jerr == nil {
-		logger.SysLog(fmt.Sprintf("Claude-Data.: %s", string(b)))
-	}
+	// b, jerr := json.Marshal(textRequest)
+	// if jerr == nil {
+	// 	logger.SysLog(fmt.Sprintf("Claude-Data.: %s", string(b)))
+	// }
 	return &claudeRequest
 }
 
