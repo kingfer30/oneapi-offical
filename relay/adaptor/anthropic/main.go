@@ -51,6 +51,8 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *Request {
 	} else if claudeRequest.Model == "claude-2" {
 		claudeRequest.Model = "claude-2.1"
 	}
+
+	nextRole := "user"
 	for _, message := range textRequest.Messages {
 		if message.Role == "system" && claudeRequest.System == "" {
 			claudeRequest.System = message.StringContent()
@@ -59,36 +61,66 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *Request {
 		claudeMessage := Message{
 			Role: message.Role,
 		}
-		var content Content
 		if message.IsStringContent() {
+			var content Content
 			content.Type = "text"
 			content.Text = message.StringContent()
 			claudeMessage.Content = append(claudeMessage.Content, content)
-			claudeRequest.Messages = append(claudeRequest.Messages, claudeMessage)
-			continue
-		}
-		var contents []Content
-		openaiContent := message.ParseContent()
-		for _, part := range openaiContent {
-			var content Content
-			if part.Type == model.ContentTypeText {
-				content.Type = "text"
-				content.Text = part.Text
-			} else if part.Type == model.ContentTypeImageURL {
-				content.Type = "image"
-				content.Source = &ImageSource{
-					Type: "base64",
+
+		} else {
+			var contents []Content
+			openaiContent := message.ParseContent()
+			for _, part := range openaiContent {
+				var content Content
+				if part.Type == model.ContentTypeText {
+					content.Type = "text"
+					content.Text = part.Text
+				} else if part.Type == model.ContentTypeImageURL {
+					content.Type = "image"
+					content.Source = &ImageSource{
+						Type: "base64",
+					}
+					mimeType, data, _ := image.GetImageFromUrl(part.ImageURL.Url)
+					content.Source.MediaType = mimeType
+					content.Source.Data = data
 				}
-				mimeType, data, _ := image.GetImageFromUrl(part.ImageURL.Url)
-				content.Source.MediaType = mimeType
-				content.Source.Data = data
+				contents = append(contents, content)
 			}
-			contents = append(contents, content)
+			claudeMessage.Content = contents
 		}
-		claudeMessage.Content = contents
+
+		if (message.Role == "assistant") && nextRole == "user" {
+			var tmpTexts []Content
+			tmpTexts = append(tmpTexts, Content{
+				Type: "text",
+				Text: "Please remember what i said",
+			})
+			claudeRequest.Messages = append(claudeRequest.Messages, Message{
+				Role:    "user",
+				Content: tmpTexts,
+			})
+			nextRole = "assistant"
+		} else if message.Role == "user" && nextRole == "assistant" {
+			var tmpTexts []Content
+			tmpTexts = append(tmpTexts, Content{
+				Type: "text",
+				Text: "OK, I have remembered what you said",
+			})
+			claudeRequest.Messages = append(claudeRequest.Messages, Message{
+				Role:    "assistant",
+				Content: tmpTexts,
+			})
+			nextRole = "user"
+		}
+
+		if message.Role == "user" {
+			nextRole = "assistant"
+		} else {
+			nextRole = "user"
+		}
 		claudeRequest.Messages = append(claudeRequest.Messages, claudeMessage)
 	}
-	b, jerr := json.Marshal(claudeRequest)
+	b, jerr := json.Marshal(textRequest)
 	if jerr == nil {
 		logger.SysLog(fmt.Sprintf("Claude-Data.: %s", string(b)))
 	}
