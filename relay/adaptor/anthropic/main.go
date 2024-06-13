@@ -53,10 +53,13 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *Request {
 	}
 
 	nextRole := "user"
-	for _, message := range textRequest.Messages {
+	for i, message := range textRequest.Messages {
 		if message.Role == "system" && claudeRequest.System == "" {
 			claudeRequest.System = message.StringContent()
 			continue
+		}
+		if message.Role == "system" && i != 0 {
+			message.Role = "assistant"
 		}
 		claudeMessage := Message{
 			Role: message.Role,
@@ -89,7 +92,7 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *Request {
 			claudeMessage.Content = contents
 		}
 
-		if (message.Role == "assistant") && nextRole == "user" {
+		if message.Role == "assistant" && nextRole == "user" {
 			var tmpTexts []Content
 			tmpTexts = append(tmpTexts, Content{
 				Type: "text",
