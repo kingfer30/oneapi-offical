@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/songquanpeng/one-api/common/client"
+
 	"github.com/songquanpeng/one-api/common/logger"
 	_ "golang.org/x/image/bmp"  // 导入BMP编解码器
 	_ "golang.org/x/image/tiff" // 导入TIFF编解码器
@@ -20,7 +22,7 @@ import (
 )
 
 func IsImageUrl(url string) (bool, error) {
-	resp, err := http.Head(url)
+	resp, err := client.UserContentRequestHTTPClient.Head(url)
 	if err != nil {
 		return false, err
 	}
@@ -35,7 +37,7 @@ func GetImageSizeFromUrl(url string) (width int, height int, err error) {
 	if !isImage {
 		return
 	}
-	resp, err := http.Get(url)
+	resp, err := client.UserContentRequestHTTPClient.Get(url)
 	if err != nil {
 		return
 	}
