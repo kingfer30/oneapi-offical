@@ -1,10 +1,11 @@
 package monitor
 
 import (
-	"github.com/songquanpeng/one-api/common/config"
-	"github.com/songquanpeng/one-api/relay/model"
 	"net/http"
 	"strings"
+
+	"github.com/songquanpeng/one-api/common/config"
+	"github.com/songquanpeng/one-api/relay/model"
 )
 
 func ShouldDisableChannel(err *model.Error, statusCode int) bool {
@@ -29,6 +30,11 @@ func ShouldDisableChannel(err *model.Error, statusCode int) bool {
 		return true
 	}
 	if err.Code == "invalid_api_key" || err.Code == "account_deactivated" {
+		return true
+	}
+	if strings.Contains(err.Message, "Quota exceeded for quota metric 'Generate Content API requests per minute'") { // gemini
+		return true
+	} else if strings.Contains(err.Message, "Permission denied: Consumer 'api_key:AI") {
 		return true
 	}
 	if strings.HasPrefix(err.Message, "Your credit balance is too low") { // anthropic
