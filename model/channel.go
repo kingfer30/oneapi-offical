@@ -15,6 +15,7 @@ const (
 	ChannelStatusEnabled          = 1 // don't use 0, 0 is the default value!
 	ChannelStatusManuallyDisabled = 2 // also don't use 0
 	ChannelStatusAutoDisabled     = 3
+	ChannelStatusSleeping         = 4
 )
 
 type Channel struct {
@@ -23,6 +24,10 @@ type Channel struct {
 	Key                string  `json:"key" gorm:"type:text"`
 	Status             int     `json:"status" gorm:"default:1"`
 	Name               string  `json:"name" gorm:"index"`
+	UsedQuota          int64   `json:"used_quota" gorm:"bigint;default:0"`
+	AwakeTime          int64   `json:"awake_time" gorm:"bigint;index:idx_status_awake_time"`
+	Priority           *int64  `json:"priority" gorm:"bigint;default:0"`
+	Config             string  `json:"config"`
 	Weight             *uint   `json:"weight" gorm:"default:0"`
 	CreatedTime        int64   `json:"created_time" gorm:"bigint"`
 	TestTime           int64   `json:"test_time" gorm:"bigint"`
@@ -33,10 +38,7 @@ type Channel struct {
 	BalanceUpdatedTime int64   `json:"balance_updated_time" gorm:"bigint"`
 	Models             string  `json:"models"`
 	Group              string  `json:"group" gorm:"type:varchar(32);default:'default'"`
-	UsedQuota          int64   `json:"used_quota" gorm:"bigint;default:0"`
 	ModelMapping       *string `json:"model_mapping" gorm:"type:varchar(1024);default:''"`
-	Priority           *int64  `json:"priority" gorm:"bigint;default:0"`
-	Config             string  `json:"config"`
 }
 
 type ChannelConfig struct {
@@ -195,6 +197,29 @@ func UpdateChannelStatusById(id int, status int) {
 	if err != nil {
 		logger.SysError("failed to update channel status: " + err.Error())
 	}
+}
+
+func SleepChannel(id int, awakeTime int64) (bool, error) {
+	err := DB.Model(&Channel{}).Where("id = ?", id).Updates(Channel{
+		Status:    ChannelStatusSleeping,
+		AwakeTime: awakeTime,
+	}).Error
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func WakeupChannel() ([]int, error) {
+	var channelIDs []int
+	err := DB.Model(&Channel{}).Where("status = ? and awake_time <= ?", ChannelStatusSleeping, helper.GetTimestamp()).Pluck("id", &channelIDs).Error
+	if err != nil {
+		logger.SysError(fmt.Sprintf("WakeupChannel faild: %s ", err.Error()))
+	}
+	result := DB.Model(&Channel{}).Where("id IN ?", channelIDs).Updates(Channel{
+		Status: ChannelStatusEnabled,
+	})
+	return channelIDs, result.Error
 }
 
 func UpdateChannelUsedQuota(id int, quota int64) {

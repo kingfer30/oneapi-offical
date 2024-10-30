@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/songquanpeng/one-api/common/config"
+	"github.com/songquanpeng/one-api/relay/apitype"
 	"github.com/songquanpeng/one-api/relay/model"
 )
 
@@ -25,11 +26,6 @@ func ShouldDisableChannel(err *model.Error, statusCode int) bool {
 	if err.Code == "invalid_api_key" || err.Code == "account_deactivated" {
 		return true
 	}
-	if strings.Contains(err.Message, "") {
-		return true
-	} else if strings.Contains(err.Message, "") {
-		return true
-	}
 	lowerMessage := strings.ToLower(err.Message)
 	if strings.Contains(lowerMessage, "your access was terminated") ||
 		strings.Contains(lowerMessage, "violation of our policies") ||
@@ -42,6 +38,18 @@ func ShouldDisableChannel(err *model.Error, statusCode int) bool {
 		strings.Contains(lowerMessage, "已欠费") ||
 		strings.Contains(lowerMessage, "quota exceeded for quota metric 'generate content api requests per minute'") || // gemini
 		strings.Contains(lowerMessage, "permission denied: consumer 'api_key:ai") {
+		return true
+	}
+	return false
+}
+
+func ShouldSleepChannel(channelType int, err *model.Error, statusCode int) bool {
+	if channelType != apitype.Gemini {
+		return false
+	}
+	lowerMessage := strings.ToLower(err.Message)
+	if strings.Contains(lowerMessage, "resource has been exhauste") ||
+		strings.Contains(lowerMessage, "e.g. check quota") {
 		return true
 	}
 	return false

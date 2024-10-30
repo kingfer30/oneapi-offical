@@ -2,6 +2,8 @@ package monitor
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/message"
@@ -24,6 +26,12 @@ func notifyRootUser(subject string, content string) {
 	if err != nil {
 		logger.SysError(fmt.Sprintf("failed to send email: %s", err.Error()))
 	}
+}
+
+// DisableChannel disable & notify
+func SleepChannel(channelId int, channelName string, awakeTime int64) {
+	model.SleepChannel(channelId, awakeTime)
+	logger.SysLog(fmt.Sprintf("channel #%d has been disabled: %s", channelId, "自动睡眠"))
 }
 
 // DisableChannel disable & notify
@@ -51,4 +59,22 @@ func EnableChannel(channelId int, channelName string) {
 	subject := fmt.Sprintf("渠道「%s」（#%d）已被启用", channelName, channelId)
 	content := fmt.Sprintf("渠道「%s」（#%d）已被启用", channelName, channelId)
 	notifyRootUser(subject, content)
+}
+
+// 渠道唤醒
+func WakeupChannel(frequency int) {
+	for {
+		time.Sleep(time.Duration(frequency) * time.Second)
+		logger.SysLog("begining wakeup channel")
+		ids, err := model.WakeupChannel()
+		if err != nil {
+			logger.SysError(fmt.Sprintf("SyncWakeupChannel error: %s", err.Error()))
+			continue
+		}
+
+		if len(ids) > 0 {
+			logger.SysLog(fmt.Sprintf("已唤醒休眠渠道: %d 个", len(ids)))
+		}
+		logger.SysLog("wakeup channel end")
+	}
 }

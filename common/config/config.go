@@ -1,12 +1,13 @@
 package config
 
 import (
-	"github.com/songquanpeng/one-api/common/env"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/songquanpeng/one-api/common/env"
 
 	"github.com/google/uuid"
 )
@@ -20,6 +21,7 @@ var ChatLink = ""
 var QuotaPerUnit = 500 * 1000.0 // $0.002 / 1K tokens
 var DisplayInCurrencyEnabled = true
 var DisplayTokenStatEnabled = true
+var HttpProxy = ""
 
 // Any options with "Secret", "Token" in its key won't be return by GetOptions
 
@@ -32,6 +34,7 @@ var ItemsPerPage = 10
 var MaxRecentItems = 100
 
 var PasswordLoginEnabled = true
+var GlobalProxyEnabled = false
 var PasswordRegisterEnabled = true
 var EmailVerificationEnabled = false
 var GitHubOAuthEnabled = false

@@ -5,6 +5,7 @@ import { API, removeTrailingSlash, showError } from '../helpers';
 const SystemSetting = () => {
   let [inputs, setInputs] = useState({
     PasswordLoginEnabled: '',
+    GlobalProxyEnabled: '',
     PasswordRegisterEnabled: '',
     EmailVerificationEnabled: '',
     GitHubOAuthEnabled: '',
@@ -19,6 +20,7 @@ const SystemSetting = () => {
     SMTPFrom: '',
     SMTPToken: '',
     ServerAddress: '',
+    HttpProxy: '',
     Footer: '',
     WeChatAuthEnabled: '',
     WeChatServerAddress: '',
@@ -76,6 +78,7 @@ const SystemSetting = () => {
       case 'TurnstileCheckEnabled':
       case 'EmailDomainRestrictionEnabled':
       case 'RegisterEnabled':
+      case 'GlobalProxyEnabled':
         value = inputs[key] === 'true' ? 'false' : 'true';
         break;
       default:
@@ -109,6 +112,7 @@ const SystemSetting = () => {
       name === 'Notice' ||
       name.startsWith('SMTP') ||
       name === 'ServerAddress' ||
+      name === 'HttpProxy' ||
       name === 'GitHubClientId' ||
       name === 'GitHubClientSecret' ||
       name === 'LarkClientId' ||
@@ -129,6 +133,7 @@ const SystemSetting = () => {
   const submitServerAddress = async () => {
     let ServerAddress = removeTrailingSlash(inputs.ServerAddress);
     await updateOption('ServerAddress', ServerAddress);
+    await updateOption('HttpProxy', inputs.HttpProxy);
   };
 
   const submitSMTP = async () => {
@@ -267,6 +272,19 @@ const SystemSetting = () => {
               placeholder='例如：https://yourdomain.com'
               value={inputs.ServerAddress}
               name='ServerAddress'
+              onChange={handleInputChange}
+            />
+            <Form.Input
+              label='代理配置'
+              placeholder='例如: http://username:password@ip:port'
+              value={inputs.HttpProxy}
+              name='HttpProxy'
+              onChange={handleInputChange}
+            />
+            <Form.Checkbox
+              checked={inputs.GlobalProxyEnabled === 'true'}
+              label='开启全局代理(如果配置了代理,并且未勾开启全局, 默认仅代理对外请求如图片、音频地址的请求等)'
+              name='GlobalProxyEnabled'
               onChange={handleInputChange}
             />
           </Form.Group>

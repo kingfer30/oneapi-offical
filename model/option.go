@@ -1,12 +1,13 @@
 package model
 
 import (
-	"github.com/songquanpeng/one-api/common/config"
-	"github.com/songquanpeng/one-api/common/logger"
-	billingratio "github.com/songquanpeng/one-api/relay/billing/ratio"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/songquanpeng/one-api/common/config"
+	"github.com/songquanpeng/one-api/common/logger"
+	billingratio "github.com/songquanpeng/one-api/relay/billing/ratio"
 )
 
 type Option struct {
@@ -24,6 +25,7 @@ func AllOption() ([]*Option, error) {
 func InitOptionMap() {
 	config.OptionMapRWMutex.Lock()
 	config.OptionMap = make(map[string]string)
+	config.OptionMap["GlobalProxyEnabled"] = strconv.FormatBool(config.GlobalProxyEnabled)
 	config.OptionMap["PasswordLoginEnabled"] = strconv.FormatBool(config.PasswordLoginEnabled)
 	config.OptionMap["PasswordRegisterEnabled"] = strconv.FormatBool(config.PasswordRegisterEnabled)
 	config.OptionMap["EmailVerificationEnabled"] = strconv.FormatBool(config.EmailVerificationEnabled)
@@ -171,6 +173,8 @@ func updateOptionMap(key string, value string) (err error) {
 		config.SMTPToken = value
 	case "ServerAddress":
 		config.ServerAddress = value
+	case "HttpProxy":
+		config.HttpProxy = value
 	case "GitHubClientId":
 		config.GitHubClientId = value
 	case "GitHubClientSecret":
