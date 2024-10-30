@@ -4,8 +4,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common/config"
-	"github.com/songquanpeng/one-api/relay/apitype"
+	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/relay/model"
 )
 
@@ -43,13 +44,14 @@ func ShouldDisableChannel(err *model.Error, statusCode int) bool {
 	return false
 }
 
-func ShouldSleepChannel(channelType int, err *model.Error, statusCode int) bool {
-	if channelType != apitype.Gemini {
-		return false
-	}
+func ShouldSleepChannel(c *gin.Context, err *model.Error, statusCode int) bool {
+	// if channelType != apitype.Gemini {
+	// 	return false
+	// }
 	lowerMessage := strings.ToLower(err.Message)
 	if strings.Contains(lowerMessage, "resource has been exhauste") ||
 		strings.Contains(lowerMessage, "e.g. check quota") {
+		logger.Infof(c.Request.Context(), "header: %v", c.Writer.Header())
 		return true
 	}
 	return false
