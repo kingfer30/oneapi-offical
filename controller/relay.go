@@ -90,9 +90,9 @@ func Relay(c *gin.Context) {
 		go processChannelRelayError(c, userId, channelId, channelName, bizErr)
 	}
 	if bizErr != nil {
-		if bizErr.StatusCode == http.StatusTooManyRequests {
-			bizErr.Error.Message = "The current group was overload, please try again later"
-		}
+		// if bizErr.StatusCode == http.StatusTooManyRequests {
+		// 	bizErr.Error.Message = "The current group was overload, please try again later"
+		// }
 
 		// BUG: bizErr is in race condition
 		bizErr.Error.Message = helper.MessageWithRequestId(bizErr.Error.Message, requestId)
