@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/message"
@@ -32,6 +33,16 @@ func notifyRootUser(subject string, content string) {
 func SleepChannel(channelId int, channelName string, awakeTime int64) {
 	model.SleepChannel(channelId, awakeTime)
 	logger.SysLog(fmt.Sprintf("channel #%d has been disabled: %s", channelId, "自动睡眠"))
+	//异步执行更新
+	go func() {
+		//写入一把锁用于并发锁
+		if count, serr := common.RedisExists("CHANNEL_GENERATE_LOCK"); serr != nil || count == 0 {
+			if ok, err := common.RedisSetNx("CHANNEL_GENERATE_LOCK", "1", time.Duration(10*time.Second)); ok || err == nil {
+				//默认方式则重新初始化
+				model.InitChannelCache()
+			}
+		}
+	}()
 }
 
 // DisableChannel disable & notify

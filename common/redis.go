@@ -2,10 +2,11 @@ package common
 
 import (
 	"context"
-	"github.com/go-redis/redis/v8"
-	"github.com/songquanpeng/one-api/common/logger"
 	"os"
 	"time"
+
+	"github.com/go-redis/redis/v8"
+	"github.com/songquanpeng/one-api/common/logger"
 )
 
 var RDB *redis.Client
@@ -66,4 +67,13 @@ func RedisDel(key string) error {
 func RedisDecrease(key string, value int64) error {
 	ctx := context.Background()
 	return RDB.DecrBy(ctx, key, value).Err()
+}
+func RedisExists(key string) (int64, error) {
+	ctx := context.Background()
+	return RDB.Exists(ctx, key).Result()
+}
+
+func RedisSetNx(key string, value string, expiration time.Duration) (bool, error) {
+	ctx := context.Background()
+	return RDB.SetNX(ctx, key, value, expiration).Result()
 }
