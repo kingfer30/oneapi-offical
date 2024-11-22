@@ -15,7 +15,7 @@ import (
 )
 
 var ModelList = []string{
-	"gemini-1.5-pro-001", "gemini-1.5-flash-001", "gemini-pro", "gemini-pro-vision", "gemini-1.5-pro-002", "gemini-1.5-flash-002", 
+	"gemini-1.5-pro-001", "gemini-1.5-flash-001", "gemini-pro", "gemini-pro-vision", "gemini-1.5-pro-002", "gemini-1.5-flash-002",
 }
 
 type Adaptor struct {
@@ -26,7 +26,7 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 		return nil, errors.New("request is nil")
 	}
 
-	geminiRequest := gemini.ConvertRequest(*request)
+	geminiRequest, _ := gemini.ConvertRequest(c, *request)
 	c.Set(ctxkey.RequestModel, request.Model)
 	c.Set(ctxkey.ConvertedRequest, geminiRequest)
 	return geminiRequest, nil

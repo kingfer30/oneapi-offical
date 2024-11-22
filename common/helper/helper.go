@@ -2,8 +2,6 @@ package helper
 
 import (
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/songquanpeng/one-api/common/random"
 	"html/template"
 	"log"
 	"net"
@@ -11,6 +9,9 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/songquanpeng/one-api/common/random"
 )
 
 func OpenBrowser(url string) {

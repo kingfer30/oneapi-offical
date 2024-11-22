@@ -29,10 +29,7 @@ func notifyRootUser(subject string, content string) {
 	}
 }
 
-// DisableChannel disable & notify
-func SleepChannel(channelId int, channelName string, awakeTime int64) {
-	model.SleepChannel(channelId, awakeTime)
-	logger.SysLog(fmt.Sprintf("channel #%d has been disabled: %s", channelId, "自动睡眠"))
+func syncUpdateChannel() {
 	//异步执行更新
 	go func() {
 		//写入一把锁用于并发锁
@@ -46,6 +43,14 @@ func SleepChannel(channelId int, channelName string, awakeTime int64) {
 }
 
 // DisableChannel disable & notify
+func SleepChannel(channelId int, channelName string, awakeTime int64) {
+	model.SleepChannel(channelId, awakeTime)
+	logger.SysLog(fmt.Sprintf("channel #%d has been disabled: %s", channelId, "自动睡眠"))
+	//异步执行更新
+	syncUpdateChannel()
+}
+
+// DisableChannel disable & notify
 func DisableChannel(channelId int, channelName string, reason string) {
 	model.UpdateChannelStatusById(channelId, model.ChannelStatusAutoDisabled)
 	logger.SysLog(fmt.Sprintf("channel #%d has been disabled: %s", channelId, reason))
@@ -53,15 +58,7 @@ func DisableChannel(channelId int, channelName string, reason string) {
 	content := fmt.Sprintf("渠道「%s」（#%d）已被禁用，原因：%s", channelName, channelId, reason)
 	notifyRootUser(subject, content)
 	//异步执行更新
-	go func() {
-		//写入一把锁用于并发锁
-		if count, serr := common.RedisExists("CHANNEL_GENERATE_LOCK"); serr != nil || count == 0 {
-			if ok, err := common.RedisSetNx("CHANNEL_GENERATE_LOCK", "1", time.Duration(10*time.Second)); ok || err == nil {
-				//默认方式则重新初始化
-				model.InitChannelCache()
-			}
-		}
-	}()
+	syncUpdateChannel()
 }
 
 func MetricDisableChannel(channelId int, successRate float64) {
@@ -98,4 +95,12 @@ func WakeupChannel(frequency int) {
 		}
 		logger.SysLog("wakeup channel end")
 	}
+}
+
+func DelFile(channelId int, fileId string) {
+	err := model.DelFileByFileId(channelId, fileId)
+	if err != nil {
+		logger.SysLogf("DelFileByFileId failed: %s", err.Error())
+	}
+	logger.SysLogf("DelFileByFileId : %d - %s", channelId, fileId)
 }

@@ -54,7 +54,10 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 		geminiEmbeddingRequest := ConvertEmbeddingRequest(*request)
 		return geminiEmbeddingRequest, nil
 	default:
-		geminiRequest := ConvertRequest(*request)
+		geminiRequest, err := ConvertRequest(c, *request)
+		if err != nil {
+			return nil, err
+		}
 		return geminiRequest, nil
 	}
 }

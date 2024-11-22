@@ -44,6 +44,15 @@ func ShouldDisableChannel(err *model.Error, statusCode int) bool {
 	return false
 }
 
+func ShouldDelFile(c *gin.Context, err *model.Error) bool {
+	lowerMessage := strings.ToLower(err.Message)
+	if strings.Contains(lowerMessage, "you do not have permission to access the file") {
+		logger.Infof(c.Request.Context(), "header: %v", c.Writer.Header())
+		return true
+	}
+	return false
+}
+
 func ShouldSleepChannel(c *gin.Context, err *model.Error, statusCode int) bool {
 	// if channelType != apitype.Gemini {
 	// 	return false

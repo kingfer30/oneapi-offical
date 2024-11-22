@@ -6,9 +6,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/songquanpeng/one-api/common/render"
+	"github.com/songquanpeng/one-api/common/video"
+	"github.com/songquanpeng/one-api/model"
+	"google.golang.org/api/option"
 
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
@@ -18,9 +23,11 @@ import (
 	"github.com/songquanpeng/one-api/common/random"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/constant"
-	"github.com/songquanpeng/one-api/relay/model"
+	"github.com/songquanpeng/one-api/relay/meta"
+	relaymodel "github.com/songquanpeng/one-api/relay/model"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/generative-ai-go/genai"
 )
 
 // https://ai.google.dev/docs/gemini_api_overview?hl=zh-cn
@@ -35,7 +42,7 @@ var mimeTypeMap = map[string]string{
 }
 
 // Setting safety to the lowest possible values since Gemini is already powerless enough
-func ConvertRequest(textRequest model.GeneralOpenAIRequest) *ChatRequest {
+func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest) (*ChatRequest, error) {
 	geminiRequest := ChatRequest{
 		Contents: make([]ChatContent, 0, len(textRequest.Messages)),
 		SafetySettings: []ChatSafetySettings{
@@ -73,7 +80,7 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *ChatRequest {
 		}
 	}
 	if textRequest.Tools != nil {
-		functions := make([]model.Function, 0, len(textRequest.Tools))
+		functions := make([]relaymodel.Function, 0, len(textRequest.Tools))
 		for _, tool := range textRequest.Tools {
 			functions = append(functions, tool.Function)
 		}
@@ -109,22 +116,39 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *ChatRequest {
 		var parts []Part
 		imageNum := 0
 		for _, part := range openaiContent {
-			if part.Type == model.ContentTypeText {
+			if part.Type == relaymodel.ContentTypeText {
 				parts = append(parts, Part{
 					Text: part.Text,
 				})
-			} else if part.Type == model.ContentTypeImageURL {
+			} else if part.Type == relaymodel.ContentTypeImageURL {
 				imageNum += 1
 				if imageNum > VisionMaxImageNum {
 					continue
 				}
-				mimeType, data, _ := image.GetImageFromUrl(part.ImageURL.Url)
-				parts = append(parts, Part{
-					InlineData: &InlineData{
-						MimeType: mimeType,
-						Data:     data,
-					},
-				})
+				mimeType := ""
+				fileData := ""
+				var err error
+				if video.IsVideoUrl(part.ImageURL.Url) {
+					err, mimeType, fileData = FileHandler(c, part.ImageURL.Url)
+					if err != nil {
+						return nil, err
+					}
+					parts = append(parts, Part{
+						FileData: &FileData{
+							MimeType: mimeType,
+							Uri:      fileData,
+						},
+					})
+				} else {
+					mimeType, fileData, _ = image.GetImageFromUrl(part.ImageURL.Url)
+					parts = append(parts, Part{
+						InlineData: &InlineData{
+							MimeType: mimeType,
+							Data:     fileData,
+						},
+					})
+				}
+
 			}
 		}
 		content.Parts = parts
@@ -188,15 +212,15 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *ChatRequest {
 		})
 	}
 
-	// b, jerr := json.Marshal(geminiRequest)
-	// if jerr == nil {
-	// 	logger.SysLog(fmt.Sprintf("Gemini-Data.: %s", string(b)))
-	// }
+	b, jerr := json.Marshal(geminiRequest)
+	if jerr == nil {
+		logger.SysLog(fmt.Sprintf("Gemini-Data.: %s", string(b)))
+	}
 
-	return &geminiRequest
+	return &geminiRequest, nil
 }
 
-func ConvertEmbeddingRequest(request model.GeneralOpenAIRequest) *BatchEmbeddingRequest {
+func ConvertEmbeddingRequest(request relaymodel.GeneralOpenAIRequest) *BatchEmbeddingRequest {
 	inputs := request.ParseInput()
 	requests := make([]EmbeddingRequest, len(inputs))
 	model := fmt.Sprintf("models/%s", request.Model)
@@ -250,8 +274,8 @@ type ChatPromptFeedback struct {
 	SafetyRatings []ChatSafetyRating `json:"safetyRatings"`
 }
 
-func getToolCalls(candidate *ChatCandidate) []model.Tool {
-	var toolCalls []model.Tool
+func getToolCalls(candidate *ChatCandidate) []relaymodel.Tool {
+	var toolCalls []relaymodel.Tool
 
 	item := candidate.Content.Parts[0]
 	if item.FunctionCall == nil {
@@ -262,10 +286,10 @@ func getToolCalls(candidate *ChatCandidate) []model.Tool {
 		logger.FatalLog("getToolCalls failed: " + err.Error())
 		return toolCalls
 	}
-	toolCall := model.Tool{
+	toolCall := relaymodel.Tool{
 		Id:   fmt.Sprintf("call_%s", random.GetUUID()),
 		Type: "function",
-		Function: model.Function{
+		Function: relaymodel.Function{
 			Arguments: string(argsBytes),
 			Name:      item.FunctionCall.FunctionName,
 		},
@@ -284,7 +308,7 @@ func responseGeminiChat2OpenAI(response *ChatResponse) *openai.TextResponse {
 	for i, candidate := range response.Candidates {
 		choice := openai.TextResponseChoice{
 			Index: i,
-			Message: model.Message{
+			Message: relaymodel.Message{
 				Role: "assistant",
 			},
 			FinishReason: constant.StopFinishReason,
@@ -322,7 +346,7 @@ func embeddingResponseGemini2OpenAI(response *EmbeddingResponse) *openai.Embeddi
 		Object: "list",
 		Data:   make([]openai.EmbeddingResponseItem, 0, len(response.Embeddings)),
 		Model:  "gemini-embedding",
-		Usage:  model.Usage{TotalTokens: 0},
+		Usage:  relaymodel.Usage{TotalTokens: 0},
 	}
 	for _, item := range response.Embeddings {
 		openAIEmbeddingResponse.Data = append(openAIEmbeddingResponse.Data, openai.EmbeddingResponseItem{
@@ -334,7 +358,7 @@ func embeddingResponseGemini2OpenAI(response *EmbeddingResponse) *openai.Embeddi
 	return &openAIEmbeddingResponse
 }
 
-func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCode, string) {
+func StreamHandler(c *gin.Context, resp *http.Response) (*relaymodel.ErrorWithStatusCode, string) {
 	responseText := ""
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(bufio.ScanLines)
@@ -384,7 +408,7 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 	return nil, responseText
 }
 
-func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName string) (*model.ErrorWithStatusCode, *model.Usage) {
+func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName string) (*relaymodel.ErrorWithStatusCode, *relaymodel.Usage) {
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return openai.ErrorWrapper(err, "read_response_body_failed", http.StatusInternalServerError), nil
@@ -399,8 +423,8 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 		return openai.ErrorWrapper(err, "unmarshal_response_body_failed", http.StatusInternalServerError), nil
 	}
 	if len(geminiResponse.Candidates) == 0 {
-		return &model.ErrorWithStatusCode{
-			Error: model.Error{
+		return &relaymodel.ErrorWithStatusCode{
+			Error: relaymodel.Error{
 				Message: "No candidates returned",
 				Type:    "server_error",
 				Param:   "",
@@ -412,7 +436,7 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 	fullTextResponse := responseGeminiChat2OpenAI(&geminiResponse)
 	fullTextResponse.Model = modelName
 	completionTokens := openai.CountTokenText(geminiResponse.GetResponseText(), modelName)
-	usage := model.Usage{
+	usage := relaymodel.Usage{
 		PromptTokens:     promptTokens,
 		CompletionTokens: completionTokens,
 		TotalTokens:      promptTokens + completionTokens,
@@ -428,7 +452,7 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 	return nil, &usage
 }
 
-func EmbeddingHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCode, *model.Usage) {
+func EmbeddingHandler(c *gin.Context, resp *http.Response) (*relaymodel.ErrorWithStatusCode, *relaymodel.Usage) {
 	var geminiEmbeddingResponse EmbeddingResponse
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -443,8 +467,8 @@ func EmbeddingHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStat
 		return openai.ErrorWrapper(err, "unmarshal_response_body_failed", http.StatusInternalServerError), nil
 	}
 	if geminiEmbeddingResponse.Error != nil {
-		return &model.ErrorWithStatusCode{
-			Error: model.Error{
+		return &relaymodel.ErrorWithStatusCode{
+			Error: relaymodel.Error{
 				Message: geminiEmbeddingResponse.Error.Message,
 				Type:    "gemini_error",
 				Param:   "",
@@ -462,4 +486,78 @@ func EmbeddingHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStat
 	c.Writer.WriteHeader(resp.StatusCode)
 	_, err = c.Writer.Write(jsonResponse)
 	return nil, &fullTextResponse.Usage
+}
+
+// 文件上传处理
+func FileHandler(c *gin.Context, url string) (error, string, string) {
+	meta := meta.GetByContext(c)
+	//判断文件是否已经存在
+	fileOld, err := model.GetFile(meta.ChannelId, url)
+	if err != nil {
+		return fmt.Errorf("get old file error: %s", err.Error()), "", ""
+	}
+	if fileOld.FileId != "" {
+		meta.APIKey = fileOld.Key
+		c.Set("FileUri", fileOld.FileId)
+		return nil, fileOld.ContentType, fileOld.FileId
+	}
+
+	//1. 保存文件
+	err, contentType, fileInfo := video.SaveMediaByUrl(url)
+	if err != nil {
+		return fmt.Errorf("upload file error: %w", err), "", ""
+	}
+
+	//2. 检查文件是否支持的类型
+	if _, err := video.CheckLegalUrl(meta.APIType, contentType); err != nil {
+		return err, "", ""
+	}
+	//3.初始化gemini客户端
+	client, err := genai.NewClient(c, option.WithAPIKey(meta.APIKey))
+	if err != nil {
+		return fmt.Errorf("init genai error: %s", err.Error()), "", ""
+	}
+	defer client.Close()
+	//4. 创建文件并上传
+	file, err := client.UploadFileFromPath(c, fileInfo.Name(), nil)
+	if err != nil {
+		return fmt.Errorf("upload file error: %s", err.Error()), "", ""
+	}
+	defer os.Remove(fileInfo.Name()) // 确保在程序结束时删除临时文件
+	defer client.DeleteFile(c, file.Name)
+
+	//5. 循环获取文件上传状态
+	retryNum := 10
+	for file.State == genai.FileStateProcessing {
+		if retryNum <= 0 {
+			return fmt.Errorf("Error: getting file state but timeout"), "", ""
+		}
+		retryNum--
+		time.Sleep(2 * time.Second)
+		var err error
+		if file, err = client.GetFile(c, file.Name); err != nil {
+			return fmt.Errorf("Error in getting file state: %s", err.Error()), "", ""
+		}
+		logger.SysLogf("Getting File State - %v", file)
+	}
+	if file.State != genai.FileStateActive {
+		return fmt.Errorf("state %s: we can't process your file because it's failed when upload to Google server, you should check your files if it's legally", file.State), "", ""
+	}
+	//6. 保存文件数据
+	fileModel := model.Files{
+		TokenId:     meta.TokenId,
+		Key:         meta.APIKey,
+		ContentType: contentType,
+		ChannelId:   meta.ChannelId,
+		Url:         url,
+		FileId:      file.URI,
+	}
+	err, fileId := fileModel.SaveFile()
+	if err != nil {
+		return fmt.Errorf("Error: saving file failed: %s", err.Error()), "", ""
+	}
+	logger.SysLogf("[Upload File] API Key: %s | Url: %s | FileId: %d", meta.APIKey, file.URI, fileId)
+	c.Set("FileUri", file.URI)
+
+	return nil, contentType, file.URI
 }

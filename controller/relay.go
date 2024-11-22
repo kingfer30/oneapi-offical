@@ -128,6 +128,12 @@ func processChannelRelayError(c *gin.Context, userId int, channelId int, channel
 		awakeTime := helper.GetTimestamp() + 60
 		monitor.SleepChannel(channelId, channelName, awakeTime)
 	}
+	if monitor.ShouldDelFile(c, &err.Error) {
+		fileUri := c.GetString("FileUri")
+		if fileUri != "" {
+			monitor.DelFile(channelId, fileUri)
+		}
+	}
 	// https://platform.openai.com/docs/guides/error-codes/api-errors
 	if monitor.ShouldDisableChannel(&err.Error, err.StatusCode) {
 		monitor.DisableChannel(channelId, channelName, err.Message)
