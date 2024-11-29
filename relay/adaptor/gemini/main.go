@@ -498,6 +498,7 @@ func FileHandler(c *gin.Context, url string) (error, string, string) {
 	}
 	if fileOld.FileId != "" {
 		meta.APIKey = fileOld.Key
+		c.Set("x-new-api-key", fileOld.Key)
 		c.Set("FileUri", fileOld.FileId)
 		return nil, fileOld.ContentType, fileOld.FileId
 	}

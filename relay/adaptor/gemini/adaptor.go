@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
+	"github.com/songquanpeng/one-api/common/logger"
 	channelhelper "github.com/songquanpeng/one-api/relay/adaptor"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/meta"
@@ -41,7 +42,13 @@ func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
 
 func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Request, meta *meta.Meta) error {
 	channelhelper.SetupCommonRequestHeader(c, req, meta)
-	req.Header.Set("x-goog-api-key", meta.APIKey)
+	key := c.GetString("x-new-api-key")
+	if key != "" {
+		logger.SysLogf("x-new-api-key: %s | old: %s ", key, meta.APIKey)
+		req.Header.Set("x-goog-api-key", key)
+	} else {
+		req.Header.Set("x-goog-api-key", meta.APIKey)
+	}
 	return nil
 }
 
