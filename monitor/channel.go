@@ -104,3 +104,18 @@ func DelFile(channelId int, fileId string) {
 	}
 	logger.SysLogf("DelFileByFileId : %d - %s", channelId, fileId)
 }
+
+func AutoDelFile(frequency int) {
+	for {
+		time.Sleep(time.Duration(frequency) * time.Second)
+		logger.SysLog("begining del file")
+		ids, err := model.DelExpiredFile()
+		if err != nil {
+			logger.SysLogf("DelFileByFileId failed: %s", err.Error())
+		}
+		if len(ids) > 0 {
+			logger.SysLog(fmt.Sprintf("自动删除过期文件: %d 个", len(ids)))
+		}
+		logger.SysLog("del file end")
+	}
+}

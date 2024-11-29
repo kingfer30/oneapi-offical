@@ -492,7 +492,7 @@ func EmbeddingHandler(c *gin.Context, resp *http.Response) (*relaymodel.ErrorWit
 func FileHandler(c *gin.Context, url string) (error, string, string) {
 	meta := meta.GetByContext(c)
 	//判断文件是否已经存在
-	fileOld, err := model.GetFile(meta.ChannelId, url)
+	fileOld, err := model.GetFile(url)
 	if err != nil {
 		return fmt.Errorf("get old file error: %s", err.Error()), "", ""
 	}
@@ -547,7 +547,6 @@ func FileHandler(c *gin.Context, url string) (error, string, string) {
 		if file, err = client.GetFile(c, file.Name); err != nil {
 			return fmt.Errorf("Error in getting file state: %s", err.Error()), "", ""
 		}
-		logger.SysLogf("Getting File State - %v", file)
 	}
 	if file.State != genai.FileStateActive {
 		return fmt.Errorf("state %s: we can't process your file because it's failed when upload to Google server, you should check your files if it's legally", file.State), "", ""

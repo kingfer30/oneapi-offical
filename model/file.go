@@ -1,5 +1,12 @@
 package model
 
+import (
+	"fmt"
+
+	"github.com/songquanpeng/one-api/common/helper"
+	"github.com/songquanpeng/one-api/common/logger"
+)
+
 type Files struct {
 	Id          int    `json:"id"`
 	TokenId     int    `json:"token_id" gorm:"index;"`
@@ -12,6 +19,8 @@ type Files struct {
 }
 
 func (file *Files) SaveFile() (error, int) {
+	//文件2天有效
+	file.ExpiredTime = helper.GetTimestamp() + (60 * 60 * 24 * 2)
 	err := DB.Create(file).Error
 	if err != nil {
 		return err, 0
@@ -20,9 +29,9 @@ func (file *Files) SaveFile() (error, int) {
 }
 
 // 获取文件
-func GetFile(channelId int, url string) (*Files, error) {
+func GetFile(url string) (*Files, error) {
 	var file *Files
-	err := DB.Order("id desc").Where("channel_id = ? and url = ?", channelId, url).Find(&file).Error
+	err := DB.Order("id desc").Where("url = ?", url).Find(&file).Error
 	return file, err
 }
 
@@ -42,4 +51,14 @@ func DelFileByFileId(channelId int, fileId string) (err error) {
 		return result.Error
 	}
 	return nil
+}
+
+func DelExpiredFile() ([]int, error) {
+	var fileIDs []int
+	err := DB.Model(&Files{}).Where("expired_time <= ?", helper.GetTimestamp()).Pluck("id", &fileIDs).Error
+	if err != nil {
+		logger.SysError(fmt.Sprintf("DelExpiredFile faild: %s ", err.Error()))
+	}
+	result := DB.Where("id IN ?", fileIDs).Delete(&Files{})
+	return fileIDs, result.Error
 }
