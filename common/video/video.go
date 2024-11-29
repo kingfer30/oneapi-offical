@@ -20,23 +20,25 @@ func IsVideoUrl(url string) bool {
 }
 
 // 保存客户上传的多媒体文件
-func SaveMediaByUrl(url string) (error, string, *os.File) {
+func SaveMediaByUrl(url string) (error, string, string) {
 	logger.SysLogf("[Saving File] - %s", url)
 	resp, err := client.UserContentRequestHTTPClient.Get(url)
 	if err != nil {
-		return err, "", nil
+		return err, "", ""
 	}
 	defer resp.Body.Close()
+
+	contentType := resp.Header.Get("Content-Type")
 
 	// 检查响应状态码
 	if resp.StatusCode != http.StatusOK {
 		logger.SysLogf("SaveMediaByUrl - Error: received non-200 response status: %s\n", resp.Status)
-		return err, "", nil
+		return err, "", ""
 	}
 	extension := filepath.Ext(url)
 	if extension == "" {
 		logger.SysLogf("SaveMediaByUrl - Error: url extension is empty: %s\n", url)
-		return err, "", nil
+		return err, "", ""
 	}
 
 	// 创建临时文件
@@ -44,49 +46,39 @@ func SaveMediaByUrl(url string) (error, string, *os.File) {
 	tempFile, err := os.CreateTemp("", tmp_name)
 	if err != nil {
 		logger.SysLogf("SaveMediaByUrl - Error: creating temporary file: %s => %s", url, tmp_name)
-		return err, "", nil
+		return err, "", ""
 	}
 
 	// 使用bufio进行高效读写
 	writer := bufio.NewWriter(tempFile)
 	defer writer.Flush()
+	defer tempFile.Close()
 
 	// 分块读取
 	const blockSize = 1024 * 1024 // 1MB
-	var headerBuff []byte
 	buf := make([]byte, blockSize)
 	for {
 		n, err := resp.Body.Read(buf)
-		logger.SysLogf("SaveMediaByUrl - Writing: %d => %s", n, err)
 		if n == 0 && err != nil {
 			break
 		}
 		if err != nil {
 			logger.SysLogf("SaveMediaByUrl - Error: resp.Body.Read: %s => %s", url, err.Error())
-			return err, "", nil
+			return err, "", ""
 		}
 		if _, err := writer.Write(buf[:n]); err != nil {
 			logger.SysLogf("SaveMediaByUrl - Error: writer.Write file: %s => %s", url, err.Error())
-			return err, "", nil
-		}
-		if len(headerBuff) <= 512 {
-			if n > 512 {
-				headerBuff = buf[:512]
-			} else {
-				headerBuff = buf[:n]
-			}
+			return err, "", ""
 		}
 	}
-	contentType := http.DetectContentType(headerBuff)
-
 	// 获取文件的真实大小
 	fileInfo, err := tempFile.Stat()
 	if err != nil {
 		logger.SysLogf("SaveMediaByUrl - Error getting file info: %s", err)
-		return err, "", nil
+		return err, "", ""
 	}
 	logger.SysLogf("SaveMediaByUrl - url: %s, save-path: %s, content-type: %s,file-size: %d", url, tmp_name, contentType, fileInfo.Size())
-	return nil, contentType, tempFile
+	return nil, contentType, tempFile.Name()
 }
 
 // 检查多媒体文件是否合法(api是否支持上传)

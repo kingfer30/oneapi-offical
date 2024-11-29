@@ -503,7 +503,7 @@ func FileHandler(c *gin.Context, url string) (error, string, string) {
 	}
 
 	//1. 保存文件
-	err, contentType, fileInfo := video.SaveMediaByUrl(url)
+	err, contentType, fileName := video.SaveMediaByUrl(url)
 	if err != nil {
 		return fmt.Errorf("upload file error: %w", err), "", ""
 	}
@@ -518,15 +518,24 @@ func FileHandler(c *gin.Context, url string) (error, string, string) {
 		return fmt.Errorf("init genai error: %s", err.Error()), "", ""
 	}
 	defer client.Close()
+
 	//4. 创建文件并上传
-	file, err := client.UploadFileFromPath(c, fileInfo.Name(), nil)
+	f, err := os.Open(fileName)
+	if err != nil {
+		return fmt.Errorf("init genai error: %s", err.Error()), "", ""
+	}
+	opts := genai.UploadFileOptions{}
+	file, err := client.UploadFile(c, "", f, &opts)
 	if err != nil {
 		return fmt.Errorf("upload file error: %s", err.Error()), "", ""
 	}
-	defer os.Remove(fileInfo.Name()) // 确保在程序结束时删除临时文件
-	defer client.DeleteFile(c, file.Name)
+
+	defer os.Remove(fileName) // 确保在程序结束时删除临时文件
 
 	//5. 循环获取文件上传状态
+	if file, err = client.GetFile(c, file.Name); err != nil {
+		return fmt.Errorf("Error in getting file state: %s", err.Error()), "", ""
+	}
 	retryNum := 10
 	for file.State == genai.FileStateProcessing {
 		if retryNum <= 0 {

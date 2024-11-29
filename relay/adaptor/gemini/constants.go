@@ -23,4 +23,7 @@ var ModelList = []string{
 	"gemini-1.5-flash-8b-latest",
 	"gemini-1.5-flash-8b-exp-0827",
 	"gemini-1.5-flash-8b-exp-0924",
+	"gemini-exp-1121",
+	"gemini-exp-1114",
+	"learnlm-1.5-pro-experimental",
 }
