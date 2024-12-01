@@ -52,6 +52,7 @@ func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Request, meta *me
 	} else {
 		req.Header.Set("x-goog-api-key", meta.APIKey)
 	}
+	req.Header.Set("User-agent", "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.4472.114 Safari/537.36")
 	return nil
 }
 
