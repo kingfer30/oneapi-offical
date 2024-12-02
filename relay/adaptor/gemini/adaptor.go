@@ -1,6 +1,7 @@
 package gemini
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -81,11 +82,16 @@ func (a *Adaptor) ConvertImageRequest(request *model.ImageRequest) (any, error) 
 }
 
 func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Reader) (*http.Response, error) {
+	body := &bytes.Buffer{}
+	_, err := io.Copy(body, requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("io.Copy failed: %w", err)
+	}
 	fullRequestURL, err := a.GetRequestURL(meta)
 	if err != nil {
 		return nil, fmt.Errorf("get request url failed: %w", err)
 	}
-	req, err := http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
+	req, err := http.NewRequest(c.Request.Method, fullRequestURL, body)
 	if err != nil {
 		return nil, fmt.Errorf("new request failed: %w", err)
 	}
@@ -108,7 +114,7 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 			retryNum--
 
 			logger.SysLogf("触发429, 正在重试: %s , 剩余次数: %d ", meta.APIKey, retryNum)
-			req, err = http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
+			req, err = http.NewRequest(c.Request.Method, fullRequestURL, body)
 			if err != nil {
 				return nil, fmt.Errorf("new request failed: %w", err)
 			}
