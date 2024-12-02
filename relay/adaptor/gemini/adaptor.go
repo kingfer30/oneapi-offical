@@ -112,7 +112,10 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 				break
 			}
 			retryNum--
-
+			_, err := io.Copy(body, requestBody)
+			if err != nil {
+				return nil, fmt.Errorf("io.Copy failed: %w", err)
+			}
 			logger.SysLogf("触发429, 正在重试: %s , 剩余次数: %d ", meta.APIKey, retryNum)
 			req, err = http.NewRequest(c.Request.Method, fullRequestURL, body)
 			if err != nil {
