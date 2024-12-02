@@ -108,6 +108,14 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 			retryNum--
 
 			logger.SysLogf("触发429, 正在重试: %s , 剩余次数: %d ", meta.APIKey, retryNum)
+			req, err = http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
+			if err != nil {
+				return nil, fmt.Errorf("new request failed: %w", err)
+			}
+			err = a.SetupRequestHeader(c, req, meta)
+			if err != nil {
+				return nil, fmt.Errorf("setup request header failed: %w", err)
+			}
 			resp, err = doRequest(c, req)
 			if err != nil {
 				return nil, fmt.Errorf("do request failed: %w", err)
