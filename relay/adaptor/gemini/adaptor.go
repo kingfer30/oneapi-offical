@@ -112,6 +112,7 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 				break
 			}
 			retryNum--
+			body := &bytes.Buffer{}
 			_, err := io.Copy(body, requestBody)
 			if err != nil {
 				return nil, fmt.Errorf("io.Copy failed: %w", err)
