@@ -176,7 +176,7 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 				Role: "user",
 				Parts: []Part{
 					{
-						Text: "Please remember what i said",
+						Text: "Hello",
 					},
 				},
 			})
@@ -186,7 +186,7 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 				Role: "model",
 				Parts: []Part{
 					{
-						Text: "OK, I have remembered the problem you described",
+						Text: "Hi",
 					},
 				},
 			})
@@ -206,7 +206,7 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 			Role: "user",
 			Parts: []Part{
 				{
-					Text: "Please remember what i said",
+					Text: "Hello",
 				},
 			},
 		})

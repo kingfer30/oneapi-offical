@@ -110,11 +110,11 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 		var retryNum = 5
 		for {
 			if retryNum == 0 {
+				logger.SysLogf("触发429, 重试失败: %s , ChannelId: %d, %s", meta.APIKey, meta.ChannelId, string(bodyData))
 				break
 			}
 			retryNum--
 			requestBody = bytes.NewBuffer(bodyData)
-			logger.SysLogf("触发429, 正在重试: %s , 剩余次数: %d, %s", meta.APIKey, retryNum, string(bodyData))
 			req, err = http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
 			if err != nil {
 				return nil, fmt.Errorf("new request failed: %w", err)
@@ -128,6 +128,7 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 				return nil, fmt.Errorf("do request failed: %w", err)
 			}
 			if resp.StatusCode != http.StatusTooManyRequests {
+				logger.SysLogf("触发429, 重试成功: %s , 剩余次数: %d, %s", meta.APIKey, retryNum, string(bodyData))
 				break
 			}
 		}
