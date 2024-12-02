@@ -8,6 +8,7 @@ import (
 	"net/url"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/generative-ai-go/genai"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/logger"
@@ -16,6 +17,8 @@ import (
 	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
 	"github.com/songquanpeng/one-api/relay/relaymode"
+	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
 
 	commonClient "github.com/songquanpeng/one-api/common/client"
 )
@@ -98,7 +101,31 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 		return nil, fmt.Errorf("do request failed: %w", err)
 	}
 	if resp.StatusCode == http.StatusTooManyRequests {
-		logger.SysLogf("429: %v", resp.Header)
+
+		client, err := genai.NewClient(c, option.WithAPIKey(meta.APIKey))
+		if err != nil {
+			return nil, fmt.Errorf("genai.NewClient failed: %w", err)
+		}
+		defer client.Close()
+		model := client.GenerativeModel("gemini-1.5-flash")
+		iter := model.GenerateContentStream(c, genai.Text("Hello"))
+		for {
+			resp, err := iter.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				logger.SysLogf("错误: %v", err)
+			}
+			logger.SysLogf("%s: - %v", meta.APIKey, resp)
+			for _, cand := range resp.Candidates {
+				if cand.Content != nil {
+					for _, part := range cand.Content.Parts {
+						fmt.Println(part)
+					}
+				}
+			}
+		}
 	}
 	return resp, nil
 }
