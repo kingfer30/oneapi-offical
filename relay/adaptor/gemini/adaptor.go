@@ -82,16 +82,17 @@ func (a *Adaptor) ConvertImageRequest(request *model.ImageRequest) (any, error) 
 }
 
 func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Reader) (*http.Response, error) {
-	body := &bytes.Buffer{}
-	_, err := io.Copy(body, requestBody)
+	bodyData, err := io.ReadAll(requestBody)
 	if err != nil {
-		return nil, fmt.Errorf("io.Copy failed: %w", err)
+		return nil, fmt.Errorf("Error reading body: ", err)
 	}
+
+	requestBody = bytes.NewBuffer(bodyData)
 	fullRequestURL, err := a.GetRequestURL(meta)
 	if err != nil {
 		return nil, fmt.Errorf("get request url failed: %w", err)
 	}
-	req, err := http.NewRequest(c.Request.Method, fullRequestURL, body)
+	req, err := http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
 	if err != nil {
 		return nil, fmt.Errorf("new request failed: %w", err)
 	}
@@ -112,13 +113,9 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 				break
 			}
 			retryNum--
-			body := &bytes.Buffer{}
-			_, err := io.Copy(body, requestBody)
-			if err != nil {
-				return nil, fmt.Errorf("io.Copy failed: %w", err)
-			}
-			logger.SysLogf("触发429, 正在重试: %s , 剩余次数: %d ", meta.APIKey, retryNum)
-			req, err = http.NewRequest(c.Request.Method, fullRequestURL, body)
+			requestBody = bytes.NewBuffer(bodyData)
+			logger.SysLogf("触发429, 正在重试: %s , 剩余次数: %d, %s", meta.APIKey, retryNum, string(bodyData))
+			req, err = http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
 			if err != nil {
 				return nil, fmt.Errorf("new request failed: %w", err)
 			}
