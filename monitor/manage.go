@@ -6,7 +6,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common/config"
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/relay/model"
 )
 
@@ -47,7 +46,6 @@ func ShouldDisableChannel(err *model.Error, statusCode int) bool {
 func ShouldDelFile(c *gin.Context, err *model.Error) bool {
 	lowerMessage := strings.ToLower(err.Message)
 	if strings.Contains(lowerMessage, "you do not have permission to access the file") {
-		logger.Infof(c.Request.Context(), "header: %v", c.Writer.Header())
 		return true
 	}
 	return false
@@ -60,7 +58,6 @@ func ShouldSleepChannel(c *gin.Context, err *model.Error, statusCode int) bool {
 	lowerMessage := strings.ToLower(err.Message)
 	if strings.Contains(lowerMessage, "resource has been exhauste") ||
 		strings.Contains(lowerMessage, "e.g. check quota") {
-		logger.Infof(c.Request.Context(), "header: %v", c.Writer.Header())
 		return true
 	}
 	return false

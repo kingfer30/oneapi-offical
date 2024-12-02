@@ -97,6 +97,9 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 	if err != nil {
 		return nil, fmt.Errorf("do request failed: %w", err)
 	}
+	if resp.StatusCode == http.StatusTooManyRequests {
+		logger.SysLogf("429: %v", resp.Header)
+	}
 	return resp, nil
 }
 func doRequest(c *gin.Context, req *http.Request) (*http.Response, error) {
