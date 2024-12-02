@@ -5,8 +5,12 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/generative-ai-go/genai"
 	"github.com/songquanpeng/one-api/common/config"
+	"github.com/songquanpeng/one-api/common/logger"
+	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
+	"google.golang.org/api/option"
 )
 
 func ShouldDisableChannel(err *model.Error, statusCode int) bool {
@@ -56,8 +60,20 @@ func ShouldSleepChannel(c *gin.Context, err *model.Error, statusCode int) bool {
 	// 	return false
 	// }
 	lowerMessage := strings.ToLower(err.Message)
-	if strings.Contains(lowerMessage, "resource has been exhauste") ||
-		strings.Contains(lowerMessage, "e.g. check quota") {
+	if strings.Contains(lowerMessage, "resource has been exhauste") || strings.Contains(lowerMessage, "e.g. check quota") {
+		meta := meta.GetByContext(c)
+		client, err := genai.NewClient(c, option.WithAPIKey(meta.APIKey))
+		if err != nil {
+			return true
+		}
+		defer client.Close()
+		model := client.GenerativeModel("gemini-1.5-flash")
+		resp, err := model.GenerateContent(c, genai.Text("who are u?"))
+		if err != nil {
+			logger.SysLogf("错误: %v", err)
+		}
+		logger.SysLogf("%s: - %v", meta.APIKey, resp)
+
 		return true
 	}
 	return false
