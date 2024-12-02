@@ -8,7 +8,6 @@ import (
 	"net/url"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/generative-ai-go/genai"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/logger"
@@ -17,8 +16,6 @@ import (
 	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
 	"github.com/songquanpeng/one-api/relay/relaymode"
-	"google.golang.org/api/iterator"
-	"google.golang.org/api/option"
 
 	commonClient "github.com/songquanpeng/one-api/common/client"
 )
@@ -100,30 +97,23 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 	if err != nil {
 		return nil, fmt.Errorf("do request failed: %w", err)
 	}
-	if resp.StatusCode == http.StatusTooManyRequests {
 
-		client, err := genai.NewClient(c, option.WithAPIKey(meta.APIKey))
-		if err != nil {
-			return nil, fmt.Errorf("genai.NewClient failed: %w", err)
-		}
-		defer client.Close()
-		model := client.GenerativeModel("gemini-1.5-flash")
-		iter := model.GenerateContentStream(c, genai.Text("Hello"))
+	if resp.StatusCode == http.StatusTooManyRequests {
+		//429 直接发起再次重试
+		var retryNum = 5
 		for {
-			resp, err := iter.Next()
-			if err == iterator.Done {
+			if retryNum == 0 {
 				break
 			}
+			retryNum--
+
+			logger.SysLogf("触发429, 正在重试: %s , 剩余次数: %d ", meta.APIKey, retryNum)
+			resp, err = doRequest(c, req)
 			if err != nil {
-				logger.SysLogf("错误: %v", err)
+				return nil, fmt.Errorf("do request failed: %w", err)
 			}
-			logger.SysLogf("%s: - %v", meta.APIKey, resp)
-			for _, cand := range resp.Candidates {
-				if cand.Content != nil {
-					for _, part := range cand.Content.Parts {
-						fmt.Println(part)
-					}
-				}
+			if resp.StatusCode != http.StatusTooManyRequests {
+				break
 			}
 		}
 	}
