@@ -3,6 +3,7 @@ package video
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -79,12 +80,16 @@ func SaveMediaByUrl(url string) (error, string, string) {
 	buf := make([]byte, blockSize)
 	for {
 		n, err := resp.Body.Read(buf)
-		if n == 0 && err != nil {
-			break
-		}
 		if err != nil {
+			if err == io.EOF {
+				// 如果是EOF，说明已经读取完毕，可以正常退出循环
+				break
+			}
 			logger.SysLogf("SaveMediaByUrl - Error: resp.Body.Read: %s => %s", url, err.Error())
 			return err, "", ""
+		}
+		if n == 0 {
+			break
 		}
 		if _, err := writer.Write(buf[:n]); err != nil {
 			logger.SysLogf("SaveMediaByUrl - Error: writer.Write file: %s => %s", url, err.Error())
