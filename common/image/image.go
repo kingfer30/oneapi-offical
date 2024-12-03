@@ -107,26 +107,26 @@ func GetImageFromUrl(url string) (mimeType string, data string, err error) {
 		logger.SysLog(fmt.Sprintf("Vision-Base64 Yes ! %s", imgType))
 		mimeType = "image/" + imgType
 		data = imgData
-		return
+		return mimeType, data, nil
 	}
 	logger.SysLog(fmt.Sprintf("Vision-Url Yes ! %s", url))
 	isImage, err := IsImageUrl(url)
 	if !isImage {
-		return
+		return "", "", fmt.Errorf("failed to get this url : it may not an image")
 	}
 	resp, err := client.UserContentRequestHTTPClient.Get(url)
 	if err != nil {
-		return
+		return "", "", fmt.Errorf("failed to get this url : %s, status : %s, err: %s", url, resp.Status, err)
 	}
 	defer resp.Body.Close()
 	buffer := bytes.NewBuffer(nil)
 	_, err = buffer.ReadFrom(resp.Body)
 	if err != nil {
-		return
+		return "", "", fmt.Errorf("failed to readFrom this url : %s, status : %s, err: %s", url, resp.Status, err)
 	}
 	mimeType = resp.Header.Get("Content-Type")
 	data = base64.StdEncoding.EncodeToString(buffer.Bytes())
-	return
+	return mimeType, data, nil
 }
 
 var (

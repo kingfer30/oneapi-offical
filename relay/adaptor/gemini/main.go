@@ -144,7 +144,10 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 						},
 					})
 				} else {
-					mimeType, fileData, _ = image.GetImageFromUrl(part.ImageURL.Url)
+					mimeType, fileData, err = image.GetImageFromUrl(part.ImageURL.Url)
+					if err != nil {
+						return nil, err
+					}
 					parts = append(parts, Part{
 						InlineData: &InlineData{
 							MimeType: mimeType,
