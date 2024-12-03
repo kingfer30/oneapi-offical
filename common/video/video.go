@@ -24,7 +24,12 @@ func IsVideoUrl(url string) (bool, error) {
 	resp, err := client.UserContentRequestHTTPClient.Get(url)
 	if err != nil {
 		logger.SysLogf("IsVideoUrl - faild:  %s", err)
-		return false, nil
+		//先改为正常请求, 再次报错再进行异常抛出
+		resp, err = client.HTTPClient.Get(url)
+		if err != nil {
+			logger.SysLogf("IsVideoUrl - faild again:  %s", err)
+			return false, fmt.Errorf("failed to get this url : %s, status : %s, err: %s", url, resp.Status, err)
+		}
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
@@ -38,7 +43,13 @@ func IsVideoUrl(url string) (bool, error) {
 func SaveMediaByUrl(url string) (error, string, string) {
 	resp, err := client.UserContentRequestHTTPClient.Get(url)
 	if err != nil {
-		return err, "", ""
+		logger.SysLogf("GetVideoUrl - faild:  %s", err)
+		//先改为正常请求, 再次报错再进行异常抛出
+		resp, err = client.HTTPClient.Get(url)
+		if err != nil {
+			logger.SysLogf("GetVideoUrl - faild again:  %s", err)
+			return fmt.Errorf("failed to get this url : %s, status : %s, err: %s", url, resp.Status, err), "", ""
+		}
 	}
 	defer resp.Body.Close()
 
