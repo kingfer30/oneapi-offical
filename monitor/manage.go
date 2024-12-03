@@ -45,7 +45,9 @@ func ShouldDisableChannel(err *model.Error, statusCode int) bool {
 
 func ShouldDelFile(c *gin.Context, err *model.Error) bool {
 	lowerMessage := strings.ToLower(err.Message)
-	if strings.Contains(lowerMessage, "you do not have permission to access the file") {
+	if strings.Contains(lowerMessage, "you do not have permission to access the file") ||
+		strings.Contains(lowerMessage, "quota exceeded for quota metric 'generate content api requests per minute'") ||
+		strings.Contains(lowerMessage, "permission denied: consumer 'api_key:ai") {
 		return true
 	}
 	return false
