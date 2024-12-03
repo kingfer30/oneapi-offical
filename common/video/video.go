@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/songquanpeng/one-api/common/client"
 	"github.com/songquanpeng/one-api/common/logger"
@@ -15,13 +16,23 @@ import (
 )
 
 func IsVideoUrl(url string) bool {
-	videoRegex := regexp.MustCompile(`\.(mp4|mov|mpeg|mpg|webm|wmv|3gpp|avi|x-flv)$`)
-	return videoRegex.MatchString(url)
+	videoRegex := regexp.MustCompile(`(mp4|mov|mpeg|mpg|webm|wmv|3gpp|avi|x-flv)$`)
+	if videoRegex.MatchString(url) {
+		return true
+	}
+	resp, err := client.UserContentRequestHTTPClient.Get(url)
+	if err != nil {
+		logger.SysLogf("IsVideoUrl - faild:  %s", err)
+		return false
+	}
+	defer resp.Body.Close()
+
+	contentType := resp.Header.Get("Content-Type")
+	return videoRegex.MatchString(contentType)
 }
 
 // 保存客户上传的多媒体文件
 func SaveMediaByUrl(url string) (error, string, string) {
-	logger.SysLogf("[Saving File] - %s", url)
 	resp, err := client.UserContentRequestHTTPClient.Get(url)
 	if err != nil {
 		return err, "", ""
@@ -37,8 +48,15 @@ func SaveMediaByUrl(url string) (error, string, string) {
 	}
 	extension := filepath.Ext(url)
 	if extension == "" {
-		logger.SysLogf("SaveMediaByUrl - Error: url extension is empty: %s\n", url)
-		return err, "", ""
+		if contentType != "" {
+			list := strings.Split(contentType, "/")
+			if len(list) > 1 {
+				extension = list[1]
+			}
+		} else {
+			logger.SysLogf("SaveMediaByUrl - Error: url extension is empty: %s\n", url)
+			return err, "", ""
+		}
 	}
 
 	// 创建临时文件
