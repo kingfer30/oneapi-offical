@@ -71,10 +71,15 @@ func SaveMediaByUrl(url string) (error, string, string) {
 			logger.SysLogf("SaveMediaByUrl - Error: url extension is empty: %s\n", url)
 			return err, "", ""
 		}
+	} else {
+		list := strings.Split(extension, "?")
+		if len(list) > 1 {
+			extension = list[0]
+		}
 	}
 
 	// 创建临时文件
-	tmp_name := fmt.Sprintf("tmp_%s%s", random.GetRandomNumberString(16), extension)
+	tmp_name := fmt.Sprintf("tmpfile_%s%s", random.GetRandomNumberString(16), extension)
 	tempFile, err := os.CreateTemp("", tmp_name)
 	if err != nil {
 		logger.SysLogf("SaveMediaByUrl - Error: creating temporary file: %s => %s", url, tmp_name)
@@ -92,15 +97,20 @@ func SaveMediaByUrl(url string) (error, string, string) {
 	for {
 		n, err := resp.Body.Read(buf)
 		if err != nil {
-			if err == io.EOF {
+			logger.SysLogf("%v", n)
+			logger.SysLogf("%v", err)
+			if n == 0 || err == io.EOF {
 				// 如果是EOF，说明已经读取完毕，可以正常退出循环
+				if n > 0 {
+					if _, err := writer.Write(buf[:n]); err != nil {
+						logger.SysLogf("SaveMediaByUrl - Error: writer.Write file: %s => %s", url, err.Error())
+						return err, "", ""
+					}
+				}
 				break
 			}
 			logger.SysLogf("SaveMediaByUrl - Error: resp.Body.Read: %s => %s", url, err.Error())
 			return err, "", ""
-		}
-		if n == 0 {
-			break
 		}
 		if _, err := writer.Write(buf[:n]); err != nil {
 			logger.SysLogf("SaveMediaByUrl - Error: writer.Write file: %s => %s", url, err.Error())
