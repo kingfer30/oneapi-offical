@@ -15,20 +15,22 @@ import (
 	"github.com/songquanpeng/one-api/relay/apitype"
 )
 
-func IsVideoUrl(url string) bool {
+func IsVideoUrl(url string) (bool, error) {
 	videoRegex := regexp.MustCompile(`(mp4|mov|mpeg|mpg|webm|wmv|3gpp|avi|x-flv)$`)
 	if videoRegex.MatchString(url) {
-		return true
+		return true, nil
 	}
 	resp, err := client.UserContentRequestHTTPClient.Get(url)
 	if err != nil {
 		logger.SysLogf("IsVideoUrl - faild:  %s", err)
-		return false
+		return false, nil
 	}
 	defer resp.Body.Close()
-
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("failed to get this url : %s, status : %s", url, resp.Status)
+	}
 	contentType := resp.Header.Get("Content-Type")
-	return videoRegex.MatchString(contentType)
+	return videoRegex.MatchString(contentType), nil
 }
 
 // 保存客户上传的多媒体文件

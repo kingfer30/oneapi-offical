@@ -128,7 +128,11 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 				mimeType := ""
 				fileData := ""
 				var err error
-				if video.IsVideoUrl(part.ImageURL.Url) {
+				ok, err := video.IsVideoUrl(part.ImageURL.Url)
+				if err != nil {
+					return nil, err
+				}
+				if ok {
 					err, mimeType, fileData = FileHandler(c, part.ImageURL.Url)
 					if err != nil {
 						return nil, err
