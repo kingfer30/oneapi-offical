@@ -98,17 +98,19 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 	}
 	nextRole := "user"
 	for k, message := range textRequest.Messages {
-		if message.StringContent() == "" {
+		msg := message.StringContent()
+		if msg == "" {
 			b, jerr := json.Marshal(textRequest)
 			if jerr == nil {
 				logger.SysLog(fmt.Sprintf("Gemini-Text-Empty: %s", string(b)))
 			}
+			msg = "Hi"
 		}
 		content := ChatContent{
 			Role: message.Role,
 			Parts: []Part{
 				{
-					Text: message.StringContent(),
+					Text: msg,
 				},
 			},
 		}
@@ -117,8 +119,12 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 		imageNum := 0
 		for _, part := range openaiContent {
 			if part.Type == relaymodel.ContentTypeText {
+				msg = part.Text
+				if msg == "" {
+					msg = "Hi"
+				}
 				parts = append(parts, Part{
-					Text: part.Text,
+					Text: msg,
 				})
 			} else if part.Type == relaymodel.ContentTypeImageURL {
 				imageNum += 1
