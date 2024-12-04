@@ -532,18 +532,18 @@ func FileHandler(c *gin.Context, url string) (error, string, string) {
 	if err != nil {
 		return fmt.Errorf("init genai error: %s", err.Error()), "", ""
 	}
-	opts := genai.UploadFileOptions{}
+	opts := genai.UploadFileOptions{
+		MIMEType:    contentType,
+		DisplayName: random.GetRandomString(10),
+	}
 	file, err := client.UploadFile(c, "", f, &opts)
 	if err != nil {
 		return fmt.Errorf("upload file error: %s", err.Error()), "", ""
 	}
-
+	defer f.Close()
 	defer os.Remove(fileName) // 确保在程序结束时删除临时文件
 
 	//5. 循环获取文件上传状态
-	if file, err = client.GetFile(c, file.Name); err != nil {
-		return fmt.Errorf("Error in getting file state: %s", err.Error()), "", ""
-	}
 	retryNum := 10
 	for file.State == genai.FileStateProcessing {
 		if retryNum <= 0 {

@@ -97,8 +97,6 @@ func SaveMediaByUrl(url string) (error, string, string) {
 	for {
 		n, err := resp.Body.Read(buf)
 		if err != nil {
-			logger.SysLogf("%v", n)
-			logger.SysLogf("%v", err)
 			if n == 0 || err == io.EOF {
 				// 如果是EOF，说明已经读取完毕，可以正常退出循环
 				if n > 0 {
@@ -123,7 +121,7 @@ func SaveMediaByUrl(url string) (error, string, string) {
 		logger.SysLogf("SaveMediaByUrl - Error getting file info: %s", err)
 		return err, "", ""
 	}
-	logger.SysLogf("SaveMediaByUrl - url: %s, save-path: %s, content-type: %s,file-size: %d", url, tmp_name, contentType, fileInfo.Size())
+	logger.SysLogf("SaveMediaByUrl - url: %s, save-path: %s, file_name: %s, content-type: %s,file-size: %d", url, tmp_name, tempFile.Name(), contentType, fileInfo.Size())
 	return nil, contentType, tempFile.Name()
 }
 
