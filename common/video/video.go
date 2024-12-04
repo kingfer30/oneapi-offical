@@ -23,7 +23,6 @@ func IsVideoUrl(url string) (bool, error) {
 	}
 	resp, err := client.UserContentRequestHTTPClient.Get(url)
 	if err != nil {
-		logger.SysLogf("IsVideoUrl - faild:  %s", err)
 		//先改为正常请求, 再次报错再进行异常抛出
 		resp, err = client.HTTPClient.Get(url)
 		if err != nil {
@@ -43,7 +42,6 @@ func IsVideoUrl(url string) (bool, error) {
 func SaveMediaByUrl(url string) (error, string, string) {
 	resp, err := client.UserContentRequestHTTPClient.Get(url)
 	if err != nil {
-		logger.SysLogf("GetVideoUrl - faild:  %s", err)
 		//先改为正常请求, 再次报错再进行异常抛出
 		resp, err = client.HTTPClient.Get(url)
 		if err != nil {
@@ -88,22 +86,27 @@ func SaveMediaByUrl(url string) (error, string, string) {
 
 	// 使用bufio进行高效读写
 	writer := bufio.NewWriter(tempFile)
-	defer writer.Flush()
 	defer tempFile.Close()
 
 	// 分块读取
 	const blockSize = 1024 * 1024 // 1MB
 	buf := make([]byte, blockSize)
+	total := 0
 	for {
 		n, err := resp.Body.Read(buf)
+		if n > 0 {
+			total += n
+		}
 		if err != nil {
 			if n == 0 || err == io.EOF {
 				// 如果是EOF，说明已经读取完毕，可以正常退出循环
 				if n > 0 {
-					if _, err := writer.Write(buf[:n]); err != nil {
+					res, err := writer.Write(buf[:n])
+					if err != nil {
 						logger.SysLogf("SaveMediaByUrl - Error: writer.Write file: %s => %s", url, err.Error())
 						return err, "", ""
 					}
+					logger.SysLogf("done - %v - %v - %v", n, res, total)
 				}
 				break
 			}
@@ -114,6 +117,9 @@ func SaveMediaByUrl(url string) (error, string, string) {
 			logger.SysLogf("SaveMediaByUrl - Error: writer.Write file: %s => %s", url, err.Error())
 			return err, "", ""
 		}
+	}
+	if err := writer.Flush(); err != nil {
+		logger.SysLogf("SaveMediaByUrl - Error: flushing writer: %s", err)
 	}
 	// 获取文件的真实大小
 	fileInfo, err := tempFile.Stat()
