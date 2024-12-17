@@ -19,7 +19,7 @@ import (
 func IsVideoUrl(url string) (bool, error) {
 	if !strings.HasPrefix(url, "http") && !strings.HasPrefix(url, "https") {
 		//url no check
-		return false, fmt.Errorf("url is not the http link")
+		return false, nil
 	}
 	videoRegex := regexp.MustCompile(`(mp4|mov|mpeg|mpg|webm|wmv|3gpp|avi|x-flv)$`)
 	if videoRegex.MatchString(url) {
