@@ -17,7 +17,7 @@ import (
 )
 
 func IsVideoUrl(url string) (bool, error) {
-	if strings.HasPrefix(url, "http") || strings.HasPrefix(url, "https") {
+	if !strings.HasPrefix(url, "http") && !strings.HasPrefix(url, "https") {
 		//url no check
 		return false, fmt.Errorf("url is not the http link")
 	}
