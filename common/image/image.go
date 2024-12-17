@@ -24,7 +24,6 @@ import (
 func IsImageUrl(url string) (bool, error) {
 	resp, err := client.UserContentRequestHTTPClient.Head(url)
 	if err != nil {
-		logger.SysLog(fmt.Sprintf("UserContentRequestHTTPClient报错: %s", err.Error()))
 		//先改为正常请求, 再次报错再进行异常抛出
 		resp, err = client.HTTPClient.Head(url)
 		if err != nil {
@@ -33,6 +32,7 @@ func IsImageUrl(url string) (bool, error) {
 		}
 	}
 	if !strings.HasPrefix(resp.Header.Get("Content-Type"), "image/") {
+		logger.SysLog(fmt.Sprintf("Content-Type错误: %s", resp.Header.Get("Content-Type")))
 		return false, nil
 	}
 	return true, nil
