@@ -24,9 +24,11 @@ import (
 func IsImageUrl(url string) (bool, error) {
 	resp, err := client.UserContentRequestHTTPClient.Head(url)
 	if err != nil {
+		logger.SysLog(fmt.Sprintf("UserContentRequestHTTPClient报错: %s", err.Error()))
 		//先改为正常请求, 再次报错再进行异常抛出
 		resp, err = client.HTTPClient.Head(url)
 		if err != nil {
+			logger.SysLog(fmt.Sprintf("HTTPClient报错: %s", err.Error()))
 			return false, err
 		}
 	}
