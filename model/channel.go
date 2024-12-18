@@ -252,7 +252,7 @@ func DeleteDisabledChannel() (int64, error) {
 // 激活渠道
 func ActivateChannel(limit int64) bool {
 	var data []map[string]interface{}
-	err := DB.Model(&Channel{}).Select("`type`, count(1) as count").Group("type").Where("status = ? Or status = ? ", ChannelStatusEnabled, ChannelStatusSleeping).Scan(&data).Error
+	err := DB.Model(&Channel{}).Select("`type`, `group`, count(1) as count").Group("`type`, `group`").Where("status = ? Or status = ? ", ChannelStatusEnabled, ChannelStatusSleeping).Scan(&data).Error
 	if err != nil {
 		logger.SysErrorf("ActivateChannel - failed to scan channel status: %s", err)
 		return false
@@ -260,15 +260,16 @@ func ActivateChannel(limit int64) bool {
 	for _, record := range data {
 		num := record["count"].(int64)
 		t := record["type"].(int64)
+		g := record["group"].(string)
 		if num < limit {
 			actNum := limit - num
-			res := DB.Model(&Channel{}).Where("type = ? and status = ?", t, ChannelStatusUnActivate).Limit(int(actNum)).Updates(Channel{
+			res := DB.Model(&Channel{}).Where("`type` = ? and `status` = ? and `group` = ?", t, ChannelStatusUnActivate, g).Limit(int(actNum)).Updates(Channel{
 				Status: ChannelStatusEnabled,
 			})
 			if res.Error != nil {
 				logger.SysErrorf("ActivateChannel - failed to update channel status: %s", res.Error)
 			}
-			logger.SysLogf("Task - ActivateChannel - update channel status, type: %d, count: %d", t, res.RowsAffected)
+			logger.SysLogf("Task - ActivateChannel - update channel status, group: %s, type: %d, count: %d", g, t, res.RowsAffected)
 		}
 	}
 	return true
