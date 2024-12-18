@@ -79,33 +79,33 @@ const ChannelsTable = () => {
     const res = await API.get(`/api/channel/?p=${startIdx}`);
     const { success, message, data } = res.data;
     if (success) {
-        let localChannels = data.map((channel) => {
-            if (channel.models === '') {
-                channel.models = [];
-                channel.test_model = "";
-            } else {
-                channel.models = channel.models.split(',');
-                if (channel.models.length > 0) {
-                    channel.test_model = channel.models[0];
-                }
-                channel.model_options = channel.models.map((model) => {
-                    return {
-                        key: model,
-                        text: model,
-                        value: model,
-                    }
-                })
-                console.log('channel', channel)
-            }
-            return channel;
-        });
-        if (startIdx === 0) {
-            setChannels(localChannels);
+      let localChannels = data.map((channel) => {
+        if (channel.models === '') {
+          channel.models = [];
+          channel.test_model = "";
         } else {
-            let newChannels = [...channels];
-            newChannels.splice(startIdx * ITEMS_PER_PAGE, data.length, ...localChannels);
-            setChannels(newChannels);
+          channel.models = channel.models.split(',');
+          if (channel.models.length > 0) {
+            channel.test_model = channel.models[0];
+          }
+          channel.model_options = channel.models.map((model) => {
+            return {
+              key: model,
+              text: model,
+              value: model,
+            }
+          })
+          console.log('channel', channel)
         }
+        return channel;
+      });
+      if (startIdx === 0) {
+        setChannels(localChannels);
+      } else {
+        let newChannels = [...channels];
+        newChannels.splice(startIdx * ITEMS_PER_PAGE, data.length, ...localChannels);
+        setChannels(newChannels);
+      }
     } else {
       showError(message);
     }
@@ -191,7 +191,7 @@ const ChannelsTable = () => {
     }
   };
 
-  const renderStatus = (status) => {
+  const renderStatus = (status,awake_time) => {
     switch (status) {
       case 1:
         return <Label basic color='green'>已启用</Label>;
@@ -212,6 +212,26 @@ const ChannelsTable = () => {
               已禁用
             </Label>}
             content='本渠道被程序自动禁用'
+            basic
+          />
+        );
+      case 4:
+        return (
+          <Popup
+            trigger={<Label basic color="pink">
+              已休眠
+            </Label>}
+            content={'系统自动休眠, 预计唤醒时间: ' + timestamp2string(awake_time)}
+            basic
+          />
+        );
+      case 5:
+        return (
+          <Popup
+            trigger={<Label basic color="blue">
+              待激活
+            </Label>}
+            content={'当渠道可用数量少于设定的补货阈值时, 自动激活'}
             basic
           />
         );
@@ -379,9 +399,9 @@ const ChannelsTable = () => {
             setPromptShown(promptID);
           }}>
             OpenAI 渠道已经不再支持通过 key 获取余额，因此余额显示为 0。对于支持的渠道类型，请点击余额进行刷新。
-            <br/>
+            <br />
             渠道测试仅支持 chat 模型，优先使用 gpt-3.5-turbo，如果该模型不可用则使用你所配置的模型列表中的第一个模型。
-            <br/>
+            <br />
             点击下方详情按钮可以显示余额以及设置额外的测试模型。
           </Message>
         )
@@ -473,7 +493,7 @@ const ChannelsTable = () => {
                   <Table.Cell>{channel.name ? channel.name : '无'}</Table.Cell>
                   <Table.Cell>{renderGroup(channel.group)}</Table.Cell>
                   <Table.Cell>{renderType(channel.type)}</Table.Cell>
-                  <Table.Cell>{renderStatus(channel.status)}</Table.Cell>
+                  <Table.Cell>{renderStatus(channel.status,channel.awake_time)}</Table.Cell>
                   <Table.Cell>
                     <Popup
                       content={channel.test_time ? renderTimestamp(channel.test_time) : '未测试'}
@@ -487,8 +507,8 @@ const ChannelsTable = () => {
                       trigger={<span onClick={() => {
                         updateChannelBalance(channel.id, channel.name, idx);
                       }} style={{ cursor: 'pointer' }}>
-                      {renderBalance(channel.type, channel.balance)}
-                    </span>}
+                        {renderBalance(channel.type, channel.balance)}
+                      </span>}
                       content='点击更新'
                       basic
                     />
@@ -592,10 +612,10 @@ const ChannelsTable = () => {
               <Button size='small' as={Link} to='/channel/add' loading={loading}>
                 添加新的渠道
               </Button>
-              <Button size='small' loading={loading} onClick={()=>{testChannels("all")}}>
+              <Button size='small' loading={loading} onClick={() => { testChannels("all") }}>
                 测试所有渠道
               </Button>
-              <Button size='small' loading={loading} onClick={()=>{testChannels("disabled")}}>
+              <Button size='small' loading={loading} onClick={() => { testChannels("disabled") }}>
                 测试禁用渠道
               </Button>
               {/*<Button size='small' onClick={updateAllChannelsBalance}*/}

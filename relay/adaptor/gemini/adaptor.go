@@ -186,8 +186,39 @@ func (a *Adaptor) GetChannelName() string {
 	return "google gemini"
 }
 
-// func turnToLib(body []byte) {
+// func turnToLib(c *gin.Context, body []byte) {
+// 	meta := meta.GetByContext(c)
 // 	var geminiRequest *ChatRequest
 // 	err := json.Unmarshal(body, &geminiRequest)
+// 	question := ""
+// 	//初始化gemini客户端
+// 	client, err := genai.NewClient(c, option.WithAPIKey(meta.APIKey))
+// 	if err != nil {
+// 		return fmt.Errorf("init genai error: %s", err.Error()), "", ""
+// 	}
+// 	defer client.Close()
+// 	model := client.GenerativeModel(meta.OriginModelName)
+// 	for i := 0; i < len(geminiRequest.Contents); i++ {
+// 		if i == (len(geminiRequest.Contents) - 1) {
+// 			//最后一个拿来提出问题
 
+// 		}
+// 		cs := model.StartChat()
+
+// 		cs.History = []*genai.Content{
+// 			{
+// 				Parts: []genai.Part{
+// 					genai.Text("Hello, I have 2 dogs in my house."),
+// 				},
+// 				Role: "user",
+// 			},
+// 			{
+// 				Parts: []genai.Part{
+// 					genai.Text("Great to meet you. What would you like to know?"),
+// 				},
+// 				Role: "model",
+// 			},
+// 		}
+
+// 	}
 // }

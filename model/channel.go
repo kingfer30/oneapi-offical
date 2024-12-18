@@ -16,6 +16,7 @@ const (
 	ChannelStatusManuallyDisabled = 2 // also don't use 0
 	ChannelStatusAutoDisabled     = 3
 	ChannelStatusSleeping         = 4
+	ChannelStatusUnActivate       = 5
 )
 
 type Channel struct {
@@ -246,4 +247,29 @@ func DeleteChannelByStatus(status int64) (int64, error) {
 func DeleteDisabledChannel() (int64, error) {
 	result := DB.Where("status = ? or status = ?", ChannelStatusAutoDisabled, ChannelStatusManuallyDisabled).Delete(&Channel{})
 	return result.RowsAffected, result.Error
+}
+
+// 激活渠道
+func ActivateChannel(limit int64) bool {
+	var data []map[string]interface{}
+	err := DB.Model(&Channel{}).Select("`type`, count(1) as count").Group("type").Where("status = ? Or status = ? ", ChannelStatusEnabled, ChannelStatusSleeping).Scan(&data).Error
+	if err != nil {
+		logger.SysErrorf("ActivateChannel - failed to scan channel status: %s", err)
+		return false
+	}
+	for _, record := range data {
+		num := record["count"].(int64)
+		t := record["type"].(int64)
+		if num < limit {
+			actNum := limit - num
+			res := DB.Model(&Channel{}).Where("type = ? and status = ?", t, ChannelStatusUnActivate).Limit(int(actNum)).Updates(Channel{
+				Status: ChannelStatusEnabled,
+			})
+			if res.Error != nil {
+				logger.SysErrorf("ActivateChannel - failed to update channel status: %s", res.Error)
+			}
+			logger.SysLogf("Task - ActivateChannel - update channel status, type: %d, count: %d", t, res.RowsAffected)
+		}
+	}
+	return true
 }

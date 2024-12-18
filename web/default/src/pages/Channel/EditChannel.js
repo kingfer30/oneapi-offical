@@ -41,12 +41,14 @@ const EditChannel = () => {
     type: 1,
     key: '',
     base_url: '',
+    status: 1,
     other: '',
     model_mapping: '',
     system_prompt: '',
     models: [],
     groups: ['default']
   };
+  const [restock, setRestock] = useState(false);
   const [batch, setBatch] = useState(false);
   const [inputs, setInputs] = useState(originInputs);
   const [originModelOptions, setOriginModelOptions] = useState([]);
@@ -60,6 +62,7 @@ const EditChannel = () => {
     sk: '',
     ak: '',
     user_id: '',
+    api_version: '',
     vertex_ai_project_id: '',
     vertex_ai_adc: ''
   });
@@ -179,12 +182,15 @@ const EditChannel = () => {
       showInfo('模型映射必须是合法的 JSON 格式！');
       return;
     }
-    let localInputs = {...inputs};
+    let localInputs = { ...inputs };
     if (localInputs.base_url && localInputs.base_url.endsWith('/')) {
       localInputs.base_url = localInputs.base_url.slice(0, localInputs.base_url.length - 1);
     }
     if (localInputs.type === 3 && localInputs.other === '') {
       localInputs.other = '2024-03-01-preview';
+    }
+    if (restock) {
+      localInputs.status = 5;
     }
     let res;
     localInputs.models = localInputs.models.join(',');
@@ -248,7 +254,7 @@ const EditChannel = () => {
                 <Message>
                   注意，<strong>模型部署名称必须和模型名称保持一致</strong>，因为 One API 会把请求体中的 model
                   参数替换为你的部署名称（模型名称中的点会被剔除），<a target='_blank'
-                                                                    href='https://github.com/songquanpeng/one-api/issues/133?notification_referrer_id=NT_kwDOAmJSYrM2NjIwMzI3NDgyOjM5OTk4MDUw#issuecomment-1571602271'>图片演示</a>。
+                    href='https://github.com/songquanpeng/one-api/issues/133?notification_referrer_id=NT_kwDOAmJSYrM2NjIwMzI3NDgyOjM5OTk4MDUw#issuecomment-1571602271'>图片演示</a>。
                 </Message>
                 <Form.Field>
                   <Form.Input
@@ -426,7 +432,7 @@ const EditChannel = () => {
             )
           }
           {
-          inputs.type !== 43 && (<>
+            inputs.type !== 43 && (<>
               <Form.Field>
                 <Form.TextArea
                   label='模型重定向'
@@ -438,7 +444,7 @@ const EditChannel = () => {
                   autoComplete='new-password'
                 />
               </Form.Field>
-            <Form.Field>
+              <Form.Field>
                 <Form.TextArea
                   label='系统提示词'
                   placeholder={`此项可选，用于强制设置给定的系统提示词，请配合自定义模型 & 模型重定向使用，首先创建一个唯一的自定义模型名称并在上面填入，之后将该自定义模型重定向映射到该渠道一个原生支持的模型`}
@@ -449,7 +455,15 @@ const EditChannel = () => {
                   autoComplete='new-password'
                 />
               </Form.Field>
-              </>
+              <Form.Field>
+                <Form.Checkbox
+                  checked={restock}
+                  label='标记为备货(勾选后, 不会立即投入使用, 而是根据后台设置的补货阈值来自动补货, 依据渠道正常状态的数量小于阈值即触发自动补货)'
+                  name='restock'
+                  onChange={() => setRestock(!restock)}
+                />
+              </Form.Field>
+            </>
             )
           }
           {
@@ -529,6 +543,32 @@ const EditChannel = () => {
                 value={config.user_id}
                 autoComplete=''
               />)
+          }
+          {
+            inputs.type === 24 && (
+              <Form.Input
+                label='Api Version'
+                name='api_version'
+                placeholder={'v1和v1beta, 默认空'}
+                onChange={handleConfigChange}
+                value={config.api_version}
+                autoComplete=''
+              />
+            )
+          }
+          {
+            inputs.type === 24 && (
+              <div style={{ lineHeight: '40px', marginBottom: '12px' }}>
+                <Button type={'button'} onClick={() => {
+                  config.api_version="v1"
+                  handleInputChange(null, config);
+                }}>v1</Button>
+                <Button type={'button'} onClick={() => {
+                  config.api_version="v1beta"
+                  handleInputChange(null, config);
+                }}>v1beta</Button>
+              </div>
+            )
           }
           {
             inputs.type !== 33 && inputs.type !== 42 && (batch ? <Form.Field>

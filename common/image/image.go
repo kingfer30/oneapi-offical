@@ -122,7 +122,10 @@ func GetImageFromUrl(url string) (mimeType string, data string, err error) {
 	}
 	resp, err := client.UserContentRequestHTTPClient.Get(url)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to get this url : %s, status : %s, err: %s", url, resp.Status, err)
+		resp, err = client.HTTPClient.Head(url)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to get this url : %s, status : %s, err: %s", url, resp.Status, err)
+		}
 	}
 	defer resp.Body.Close()
 	buffer := bytes.NewBuffer(nil)

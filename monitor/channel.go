@@ -105,10 +105,10 @@ func DelFile(channelId int, fileId string) {
 	logger.SysLogf("DelFileByFileId : %d - %s", channelId, fileId)
 }
 
+// 自动删除过期文件
 func AutoDelFile(frequency int) {
 	for {
 		time.Sleep(time.Duration(frequency) * time.Second)
-		logger.SysLog("begining del file")
 		ids, err := model.DelExpiredFile()
 		if err != nil {
 			logger.SysLogf("DelFileByFileId failed: %s", err.Error())
@@ -116,6 +116,16 @@ func AutoDelFile(frequency int) {
 		if len(ids) > 0 {
 			logger.SysLog(fmt.Sprintf("自动删除过期文件: %d 个", len(ids)))
 		}
-		logger.SysLog("del file end")
+	}
+}
+
+// 自动激活渠道
+func AutoActivate(frequency int) {
+	for {
+		time.Sleep(time.Duration(frequency) * time.Second)
+		if config.QuotaForAddChannel == 0 {
+			continue
+		}
+		_ = model.ActivateChannel(int64(config.QuotaForAddChannel))
 	}
 }

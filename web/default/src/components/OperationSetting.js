@@ -16,6 +16,7 @@ const OperationSetting = () => {
     TopUpLink: '',
     ChatLink: '',
     QuotaPerUnit: 0,
+    QuotaForAddChannel: 0,
     AutomaticDisableChannelEnabled: '',
     AutomaticEnableChannelEnabled: '',
     ChannelDisableThreshold: 0,
@@ -88,6 +89,9 @@ const OperationSetting = () => {
         }
         if (originInputs['QuotaRemindThreshold'] !== inputs.QuotaRemindThreshold) {
           await updateOption('QuotaRemindThreshold', inputs.QuotaRemindThreshold);
+        }
+        if (originInputs['QuotaForAddChannel'] !== inputs.QuotaForAddChannel) {
+          await updateOption('QuotaForAddChannel', inputs.QuotaForAddChannel);
         }
         break;
       case 'ratio':
@@ -240,10 +244,10 @@ const OperationSetting = () => {
           </Form.Group>
           <Form.Group widths={4}>
             <Form.Input label='目标时间' value={historyTimestamp} type='datetime-local'
-                        name='history_timestamp'
-                        onChange={(e, { name, value }) => {
-                          setHistoryTimestamp(value);
-                        }} />
+              name='history_timestamp'
+              onChange={(e, { name, value }) => {
+                setHistoryTimestamp(value);
+              }} />
           </Form.Group>
           <Form.Button onClick={() => {
             deleteHistoryLogs().then();
@@ -272,6 +276,16 @@ const OperationSetting = () => {
               type='number'
               min='0'
               placeholder='低于此额度时将发送邮件提醒用户'
+            />
+            <Form.Input
+              label='补货阈值'
+              name='QuotaForAddChannel'
+              onChange={handleInputChange}
+              autoComplete='new-password'
+              value={inputs.QuotaForAddChannel}
+              type='number'
+              min='0'
+              placeholder='低于此阈值时, 对应渠道类型自动将待激活的渠道激活'
             />
           </Form.Group>
           <Form.Group inline>

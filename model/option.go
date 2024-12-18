@@ -227,6 +227,8 @@ func updateOptionMap(key string, value string) (err error) {
 		config.PreConsumedQuota, _ = strconv.ParseInt(value, 10, 64)
 	case "RetryTimes":
 		config.RetryTimes, _ = strconv.Atoi(value)
+	case "QuotaForAddChannel":
+		config.QuotaForAddChannel, _ = strconv.Atoi(value)
 	case "ModelRatio":
 		err = billingratio.UpdateModelRatioByJSONString(value)
 	case "GroupRatio":

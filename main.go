@@ -92,6 +92,7 @@ func main() {
 	}
 	go monitor.WakeupChannel(config.SyncFrequency)
 	go monitor.AutoDelFile(config.SyncFrequency)
+	go monitor.AutoActivate(10)
 	openai.InitTokenEncoders()
 	client.Init()
 

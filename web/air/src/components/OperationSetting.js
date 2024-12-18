@@ -140,6 +140,9 @@ const OperationSetting = () => {
         if (originInputs['RetryTimes'] !== inputs.RetryTimes) {
           await updateOption('RetryTimes', inputs.RetryTimes);
         }
+        if (originInputs['QuotaForAddChannel'] !== inputs.QuotaForAddChannel) {
+          await updateOption('QuotaForAddChannel', inputs.QuotaForAddChannel);
+        }
         break;
     }
   };
@@ -201,6 +204,17 @@ const OperationSetting = () => {
               autoComplete='new-password'
               value={inputs.RetryTimes}
               placeholder='失败重试次数'
+            />
+            <Form.Input
+              label='补货阈值'
+              name='QuotaForAddChannel'
+              type={'number'}
+              step='1'
+              min='0'
+              onChange={handleInputChange}
+              autoComplete='new-password'
+              value={inputs.QuotaForAddChannel}
+              placeholder='补货阈值'
             />
           </Form.Group>
           <Form.Group inline>
