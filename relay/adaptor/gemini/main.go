@@ -225,10 +225,10 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 		})
 	}
 
-	b, jerr := json.Marshal(geminiRequest)
-	if jerr == nil {
-		logger.SysLog(fmt.Sprintf("Gemini-Data.: %s", string(b)))
-	}
+	// b, jerr := json.Marshal(geminiRequest)
+	// if jerr == nil {
+	// 	logger.SysLog(fmt.Sprintf("Gemini-Data.: %s", string(b)))
+	// }
 
 	return &geminiRequest, nil
 }
