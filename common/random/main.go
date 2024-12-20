@@ -1,10 +1,13 @@
 package random
 
 import (
-	"github.com/google/uuid"
+	"crypto/md5"
+	"encoding/hex"
 	"math/rand"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func GetUUID() string {
@@ -58,4 +61,10 @@ func GetRandomNumberString(length int) string {
 // RandRange returns a random number between min and max (max is not included)
 func RandRange(min, max int) int {
 	return min + rand.Intn(max-min)
+}
+
+func StrToMd5(str string) string {
+	hash := md5.Sum([]byte(str))
+	encryptedStr := hex.EncodeToString(hash[:])
+	return encryptedStr
 }

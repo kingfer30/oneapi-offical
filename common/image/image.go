@@ -3,17 +3,21 @@ package image
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
 	"sync"
 
+	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/client"
+	"github.com/songquanpeng/one-api/common/random"
 
 	"github.com/songquanpeng/one-api/common/logger"
 	_ "golang.org/x/image/bmp"  // 导入BMP编解码器
@@ -21,24 +25,79 @@ import (
 	_ "golang.org/x/image/webp" // 导入WebP编解码器
 )
 
+var CacheSecond int64 = 600
+
+type ImageCache struct {
+	IsURL       bool   `json:"is_url"`
+	ContentType string `json:"content_type"`
+	Width       int    `json:"width"`
+	Height      int    `json:"height"`
+}
+
+func setImageCache(url string, isUrl bool, contentType string, width int, height int) {
+	var cache *ImageCache
+	result, err := common.RedisHashGet("image_url", random.StrToMd5(url))
+	if err == nil {
+		err = json.Unmarshal([]byte(result), &cache)
+		if err != nil {
+			cache = &ImageCache{
+				IsURL: isUrl,
+			}
+		}
+	} else {
+		cache = &ImageCache{
+			IsURL: isUrl,
+		}
+	}
+	if contentType != "" && cache.ContentType != contentType {
+		cache.ContentType = contentType
+	}
+	if width != 0 && cache.Width != width {
+		cache.Width = width
+	}
+	if height != 0 && cache.Height != height {
+		cache.Height = height
+	}
+	common.RedisHashSet("image_url", random.StrToMd5(url), cache, CacheSecond)
+}
 func IsImageUrl(url string) (bool, error) {
-	resp, err := client.UserContentRequestHTTPClient.Head(url)
+	var cache *ImageCache
+	result, err := common.RedisHashGet("image_url", random.StrToMd5(url))
+	if err == nil {
+		err = json.Unmarshal([]byte(result), &cache)
+		log.Printf("err: %v, %s, %s", err, random.StrToMd5(url), result)
+		if err == nil {
+			return cache.IsURL, nil
+		}
+	}
+	resp, err := client.UserContentRequestHTTPClient.Get(url)
 	if err != nil {
 		//先改为正常请求, 再次报错再进行异常抛出
-		resp, err = client.HTTPClient.Head(url)
+		resp, err = client.HTTPClient.Get(url)
 		if err != nil {
 			logger.SysLog(fmt.Sprintf("HTTPClient报错: %s", err.Error()))
+			setImageCache(url, false, "", 0, 0)
 			return false, err
 		}
 	}
 	if !strings.HasPrefix(resp.Header.Get("Content-Type"), "image/") {
 		logger.SysLog(fmt.Sprintf("Content-Type错误: %s", resp.Header.Get("Content-Type")))
+		setImageCache(url, false, "", 0, 0)
 		return false, nil
 	}
+	setImageCache(url, true, resp.Header.Get("Content-Type"), 0, 0)
 	return true, nil
 }
 
 func GetImageSizeFromUrl(url string) (width int, height int, err error) {
+	var cache *ImageCache
+	result, err := common.RedisHashGet("image_url", random.StrToMd5(url))
+	if err == nil {
+		err = json.Unmarshal([]byte(result), &cache)
+		if err == nil {
+			return cache.Width, cache.Height, nil
+		}
+	}
 	isImage, err := IsImageUrl(url)
 	if !isImage {
 		return
@@ -52,6 +111,7 @@ func GetImageSizeFromUrl(url string) (width int, height int, err error) {
 	if err != nil {
 		return
 	}
+	setImageCache(url, true, "", img.Width, img.Height)
 	return img.Width, img.Height, nil
 }
 

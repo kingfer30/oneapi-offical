@@ -2,6 +2,7 @@ package video
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,11 +11,44 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/client"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/random"
 	"github.com/songquanpeng/one-api/relay/apitype"
 )
+
+var CacheSecond int64 = 600
+
+type VideoCache struct {
+	IsVideo     bool   `json:"is_video"`
+	ContentType string `json:"content_type"`
+	Path        string `json:"path"`
+}
+
+func setVideoCache(url string, IsVideo bool, contentType string, path string) {
+	var cache *VideoCache
+	result, err := common.RedisHashGet("video_url", random.StrToMd5(url))
+	if err == nil {
+		err = json.Unmarshal([]byte(result), &cache)
+		if err != nil {
+			cache = &VideoCache{
+				IsVideo: IsVideo,
+			}
+		}
+	} else {
+		cache = &VideoCache{
+			IsVideo: IsVideo,
+		}
+	}
+	if contentType != "" && cache.ContentType != contentType {
+		cache.ContentType = contentType
+	}
+	if path != "" && cache.Path != path {
+		cache.Path = path
+	}
+	common.RedisHashSet("video_url", random.StrToMd5(url), cache, CacheSecond)
+}
 
 func IsVideoUrl(url string) (bool, error) {
 	if !strings.HasPrefix(url, "http") && !strings.HasPrefix(url, "https") {
@@ -25,25 +59,44 @@ func IsVideoUrl(url string) (bool, error) {
 	if videoRegex.MatchString(url) {
 		return true, nil
 	}
+	var cache *VideoCache
+	result, err := common.RedisHashGet("video_url", random.StrToMd5(url))
+	if err == nil {
+		err = json.Unmarshal([]byte(result), &cache)
+		if err == nil {
+			return cache.IsVideo, nil
+		}
+	}
 	resp, err := client.UserContentRequestHTTPClient.Get(url)
 	if err != nil {
 		//先改为正常请求, 再次报错再进行异常抛出
 		resp, err = client.HTTPClient.Get(url)
 		if err != nil {
 			logger.SysLogf("IsVideoUrl - faild again:  %s", err)
-			return false, fmt.Errorf("failed to get this url : %s, status : %s, err: %s", url, resp.Status, err)
+			setVideoCache(url, false, "", "")
+			return false, fmt.Errorf("failed to get this url : %s, err: %s", url, err)
 		}
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
+		setVideoCache(url, false, "", "")
 		return false, fmt.Errorf("failed to get this url : %s, status : %s", url, resp.Status)
 	}
 	contentType := resp.Header.Get("Content-Type")
+	setVideoCache(url, videoRegex.MatchString(contentType), contentType, "")
 	return videoRegex.MatchString(contentType), nil
 }
 
 // 保存客户上传的多媒体文件
 func SaveMediaByUrl(url string) (error, string, string) {
+	var cache *VideoCache
+	result, err := common.RedisHashGet("video_url", random.StrToMd5(url))
+	if err == nil {
+		err = json.Unmarshal([]byte(result), &cache)
+		if err == nil {
+			return nil, cache.ContentType, cache.Path
+		}
+	}
 	resp, err := client.UserContentRequestHTTPClient.Get(url)
 	if err != nil {
 		//先改为正常请求, 再次报错再进行异常抛出
@@ -132,6 +185,7 @@ func SaveMediaByUrl(url string) (error, string, string) {
 		return err, "", ""
 	}
 	logger.SysLogf("SaveMediaByUrl - url: %s, save-path: %s, file_name: %s, content-type: %s,file-size: %d", url, tmp_name, tempFile.Name(), contentType, fileInfo.Size())
+	setVideoCache(url, true, contentType, tempFile.Name())
 	return nil, contentType, tempFile.Name()
 }
 

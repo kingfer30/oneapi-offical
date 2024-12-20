@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"time"
 
@@ -76,4 +77,31 @@ func RedisExists(key string) (int64, error) {
 func RedisSetNx(key string, value string, expiration time.Duration) (bool, error) {
 	ctx := context.Background()
 	return RDB.SetNX(ctx, key, value, expiration).Result()
+}
+
+func RedisHashSet(key string, field string, value any, expiration int64) error {
+	ctx := context.Background()
+	jsonBytes, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	_, err = RDB.HSet(ctx, key, field, string(jsonBytes)).Result()
+	if err != nil {
+		return err
+	}
+	if expiration != 0 {
+		expireTime := time.Duration(expiration) * time.Second
+		err = RDB.Expire(ctx, key, expireTime).Err()
+	}
+	return err
+}
+
+func RedisHashGet(key string, field string) (string, error) {
+	ctx := context.Background()
+	return RDB.HGet(ctx, key, field).Result()
+}
+
+func RedisHashDel(key string, field string) error {
+	ctx := context.Background()
+	return RDB.HDel(ctx, key, field).Err()
 }
