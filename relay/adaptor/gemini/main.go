@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -413,7 +412,6 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relay
 	common.SetEventStreamHeaders(c)
 	for scanner.Scan() {
 		data := scanner.Text()
-		log.Print(data)
 		data = strings.TrimSpace(data)
 		if !strings.HasPrefix(data, "data: ") {
 			continue
