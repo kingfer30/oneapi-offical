@@ -272,6 +272,7 @@ func (g *ChatResponse) GetResponseText(meta *meta.Meta) string {
 				think := "thinkingStart\n" + g.Candidates[0].Content.Parts[0].Text
 				think += "\nthinkingEnd\n"
 				think += g.Candidates[0].Content.Parts[1].Text
+				meta.EndThinking = true
 				return think
 			}
 			if meta.EndThinking {
