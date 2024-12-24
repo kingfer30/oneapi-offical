@@ -274,7 +274,12 @@ func (g *ChatResponse) GetResponseText(meta *meta.Meta) string {
 				think += g.Candidates[0].Content.Parts[1].Text
 				return think
 			}
-			return fmt.Sprintf("thinkingStart\n%s\nthinkingEnd\n", g.Candidates[0].Content.Parts[0].Text)
+			if meta.EndThinking {
+				return g.Candidates[0].Content.Parts[0].Text
+			} else {
+				return fmt.Sprintf("thinkingStart\n%s\nthinkingEnd\n", g.Candidates[0].Content.Parts[0].Text)
+			}
+
 		} else {
 			if len(g.Candidates[0].Content.Parts) > 1 {
 				think := g.Candidates[0].Content.Parts[0].Text
