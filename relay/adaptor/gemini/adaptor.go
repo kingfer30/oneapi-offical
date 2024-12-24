@@ -60,6 +60,9 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	if request == nil {
 		return nil, errors.New("request is nil")
 	}
+	if request.Thinking {
+		c.Set("hua_thinking", true)
+	}
 	switch relayMode {
 	case relaymode.Embeddings:
 		geminiEmbeddingRequest := ConvertEmbeddingRequest(*request)
@@ -163,16 +166,19 @@ func doRequest(c *gin.Context, req *http.Request) (*http.Response, error) {
 }
 
 func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Meta) (usage *model.Usage, err *model.ErrorWithStatusCode) {
+	if c.GetBool("hua_thinking") {
+		meta.Thinking = true
+	}
 	if meta.IsStream {
 		var responseText string
-		err, responseText = StreamHandler(c, resp)
+		err, responseText = StreamHandler(c, resp, meta)
 		usage = openai.ResponseText2Usage(responseText, meta.ActualModelName, meta.PromptTokens)
 	} else {
 		switch meta.Mode {
 		case relaymode.Embeddings:
 			err, usage = EmbeddingHandler(c, resp)
 		default:
-			err, usage = Handler(c, resp, meta.PromptTokens, meta.ActualModelName)
+			err, usage = Handler(c, resp, meta)
 		}
 	}
 	return
@@ -186,39 +192,6 @@ func (a *Adaptor) GetChannelName() string {
 	return "google gemini"
 }
 
-// func turnToLib(c *gin.Context, body []byte) {
-// 	meta := meta.GetByContext(c)
-// 	var geminiRequest *ChatRequest
-// 	err := json.Unmarshal(body, &geminiRequest)
-// 	question := ""
-// 	//初始化gemini客户端
-// 	client, err := genai.NewClient(c, option.WithAPIKey(meta.APIKey))
-// 	if err != nil {
-// 		return fmt.Errorf("init genai error: %s", err.Error()), "", ""
-// 	}
-// 	defer client.Close()
-// 	model := client.GenerativeModel(meta.OriginModelName)
-// 	for i := 0; i < len(geminiRequest.Contents); i++ {
-// 		if i == (len(geminiRequest.Contents) - 1) {
-// 			//最后一个拿来提出问题
+func ChatOnline(c *gin.Context, relayMode int, request *model.GeneralOpenAIRequest) {
 
-// 		}
-// 		cs := model.StartChat()
-
-// 		cs.History = []*genai.Content{
-// 			{
-// 				Parts: []genai.Part{
-// 					genai.Text("Hello, I have 2 dogs in my house."),
-// 				},
-// 				Role: "user",
-// 			},
-// 			{
-// 				Parts: []genai.Part{
-// 					genai.Text("Great to meet you. What would you like to know?"),
-// 				},
-// 				Role: "model",
-// 			},
-// 		}
-
-// 	}
-// }
+}

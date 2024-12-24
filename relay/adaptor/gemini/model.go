@@ -54,6 +54,7 @@ type Part struct {
 	InlineData   *InlineData   `json:"inlineData,omitempty"`
 	FileData     *FileData     `json:"fileData,omitempty"`
 	FunctionCall *FunctionCall `json:"functionCall,omitempty"`
+	Thought      bool          `json:"thought,omitempty"`
 }
 
 type ChatContent struct {
@@ -78,5 +79,5 @@ type ChatGenerationConfig struct {
 	TopK             float64  `json:"topK,omitempty"`
 	MaxOutputTokens  int      `json:"maxOutputTokens,omitempty"`
 	CandidateCount   int      `json:"candidateCount,omitempty"`
-	StopSequences    any `json:"stopSequences,omitempty"`
+	StopSequences    any      `json:"stopSequences,omitempty"`
 }

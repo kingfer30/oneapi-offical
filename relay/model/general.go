@@ -1,15 +1,25 @@
 package model
 
 type ResponseFormat struct {
-	Type       string      `json:"type,omitempty"`
-	JsonSchema *JSONSchema `json:"json_schema,omitempty"`
+	Type   string  `json:"type,omitempty"`
+	Schema *Schema `json:"schema,omitempty"`
 }
 
 type JSONSchema struct {
-	Description string                 `json:"description,omitempty"`
-	Name        string                 `json:"name"`
-	Schema      map[string]interface{} `json:"schema,omitempty"`
-	Strict      *bool                  `json:"strict,omitempty"`
+	Description string `json:"description,omitempty"`
+	Name        string `json:"name"`
+	Schema      Schema `json:"schema,omitempty"`
+	Strict      *bool  `json:"strict,omitempty"`
+}
+type Schema struct {
+	Type        int32    `json:"type"`
+	Format      string   `json:"format,omitempty"`
+	Description string   `json:"description,omitempty"`
+	Nullable    bool     `json:"nullable,omitempty"`
+	Enum        []string `json:"enum,omitempty"`
+	MaxItems    int64    `json:"maxItems,omitempty"`
+	MinItems    int64    `json:"minItems,omitempty"`
+	Required    []string `json:"required,omitempty"`
 }
 
 type Audio struct {
@@ -65,6 +75,7 @@ type GeneralOpenAIRequest struct {
 	// Others
 	Instruction string `json:"instruction,omitempty"`
 	NumCtx      int    `json:"num_ctx,omitempty"`
+	Thinking    bool   `json:"thinking,omitempty"`
 }
 
 func (r GeneralOpenAIRequest) ParseInput() []string {

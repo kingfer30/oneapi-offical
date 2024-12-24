@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -74,8 +75,8 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 		if mimeType, ok := mimeTypeMap[textRequest.ResponseFormat.Type]; ok {
 			geminiRequest.GenerationConfig.ResponseMimeType = mimeType
 		}
-		if textRequest.ResponseFormat.JsonSchema != nil {
-			geminiRequest.GenerationConfig.ResponseSchema = textRequest.ResponseFormat.JsonSchema.Schema
+		if textRequest.ResponseFormat.Schema != nil {
+			geminiRequest.GenerationConfig.ResponseSchema = textRequest.ResponseFormat.Schema
 			geminiRequest.GenerationConfig.ResponseMimeType = mimeTypeMap["json_object"]
 		}
 	}
@@ -261,12 +262,30 @@ type ChatResponse struct {
 	PromptFeedback ChatPromptFeedback `json:"promptFeedback"`
 }
 
-func (g *ChatResponse) GetResponseText() string {
+func (g *ChatResponse) GetResponseText(meta *meta.Meta) string {
 	if g == nil {
 		return ""
 	}
 	if len(g.Candidates) > 0 && len(g.Candidates[0].Content.Parts) > 0 {
-		return g.Candidates[0].Content.Parts[0].Text
+		if strings.Contains(meta.ActualModelName, "think") && meta.Thinking {
+			//thinkingStart:\n%s\nthinkingEnd\n%s
+			if len(g.Candidates[0].Content.Parts) > 1 {
+				think := "thinkingStart\n" + g.Candidates[0].Content.Parts[0].Text
+				think += "\nthinkingEnd\n"
+				think += g.Candidates[0].Content.Parts[1].Text
+				return think
+			}
+			return fmt.Sprintf("thinkingStart\n%s\nthinkingEnd\n", g.Candidates[0].Content.Parts[0].Text)
+		} else {
+			if len(g.Candidates[0].Content.Parts) > 1 {
+				think := g.Candidates[0].Content.Parts[0].Text
+				think += "\n"
+				think += g.Candidates[0].Content.Parts[1].Text
+				return think
+			}
+			return g.Candidates[0].Content.Parts[0].Text
+		}
+
 	}
 	return ""
 }
@@ -311,7 +330,7 @@ func getToolCalls(candidate *ChatCandidate) []relaymodel.Tool {
 	return toolCalls
 }
 
-func responseGeminiChat2OpenAI(response *ChatResponse) *openai.TextResponse {
+func responseGeminiChat2OpenAI(response *ChatResponse, meta *meta.Meta) *openai.TextResponse {
 	fullTextResponse := openai.TextResponse{
 		Id:      fmt.Sprintf("chatcmpl-%s", random.GetUUID()),
 		Object:  "chat.completion",
@@ -322,7 +341,8 @@ func responseGeminiChat2OpenAI(response *ChatResponse) *openai.TextResponse {
 		choice := openai.TextResponseChoice{
 			Index: i,
 			Message: relaymodel.Message{
-				Role: "assistant",
+				Role:    "assistant",
+				Content: "",
 			},
 			FinishReason: constant.StopFinishReason,
 		}
@@ -330,7 +350,21 @@ func responseGeminiChat2OpenAI(response *ChatResponse) *openai.TextResponse {
 			if candidate.Content.Parts[0].FunctionCall != nil {
 				choice.Message.ToolCalls = getToolCalls(&candidate)
 			} else {
-				choice.Message.Content = candidate.Content.Parts[0].Text
+				for i, item := range candidate.Content.Parts {
+					if strings.Contains(meta.ActualModelName, "think") && meta.Thinking {
+						if i == 0 {
+							choice.Message.Content = fmt.Sprintf("thinkingStart:\n%s", item.Text)
+						} else {
+							choice.Message.Content = fmt.Sprintf("%s\nthinkingEnd\n%s", choice.Message.Content, item.Text)
+						}
+					} else {
+						if i == 0 {
+							choice.Message.Content = item.Text
+						} else {
+							choice.Message.Content = fmt.Sprintf("%s\n%s", choice.Message.Content, item.Text)
+						}
+					}
+				}
 			}
 		} else {
 			choice.Message.Content = ""
@@ -341,9 +375,9 @@ func responseGeminiChat2OpenAI(response *ChatResponse) *openai.TextResponse {
 	return &fullTextResponse
 }
 
-func streamResponseGeminiChat2OpenAI(geminiResponse *ChatResponse) *openai.ChatCompletionsStreamResponse {
+func streamResponseGeminiChat2OpenAI(geminiResponse *ChatResponse, meta *meta.Meta) *openai.ChatCompletionsStreamResponse {
 	var choice openai.ChatCompletionsStreamResponseChoice
-	choice.Delta.Content = geminiResponse.GetResponseText()
+	choice.Delta.Content = geminiResponse.GetResponseText(meta)
 	//choice.FinishReason = &constant.StopFinishReason
 	var response openai.ChatCompletionsStreamResponse
 	response.Id = fmt.Sprintf("chatcmpl-%s", random.GetUUID())
@@ -371,15 +405,15 @@ func embeddingResponseGemini2OpenAI(response *EmbeddingResponse) *openai.Embeddi
 	return &openAIEmbeddingResponse
 }
 
-func StreamHandler(c *gin.Context, resp *http.Response) (*relaymodel.ErrorWithStatusCode, string) {
+func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relaymodel.ErrorWithStatusCode, string) {
 	responseText := ""
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(bufio.ScanLines)
 
 	common.SetEventStreamHeaders(c)
-
 	for scanner.Scan() {
 		data := scanner.Text()
+		log.Print(data)
 		data = strings.TrimSpace(data)
 		if !strings.HasPrefix(data, "data: ") {
 			continue
@@ -394,7 +428,7 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*relaymodel.ErrorWithSt
 			continue
 		}
 
-		response := streamResponseGeminiChat2OpenAI(&geminiResponse)
+		response := streamResponseGeminiChat2OpenAI(&geminiResponse, meta)
 		if response == nil {
 			continue
 		}
@@ -421,7 +455,7 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*relaymodel.ErrorWithSt
 	return nil, responseText
 }
 
-func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName string) (*relaymodel.ErrorWithStatusCode, *relaymodel.Usage) {
+func Handler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relaymodel.ErrorWithStatusCode, *relaymodel.Usage) {
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return openai.ErrorWrapper(err, "read_response_body_failed", http.StatusInternalServerError), nil
@@ -446,13 +480,13 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 			StatusCode: resp.StatusCode,
 		}, nil
 	}
-	fullTextResponse := responseGeminiChat2OpenAI(&geminiResponse)
-	fullTextResponse.Model = modelName
-	completionTokens := openai.CountTokenText(geminiResponse.GetResponseText(), modelName)
+	fullTextResponse := responseGeminiChat2OpenAI(&geminiResponse, meta)
+	fullTextResponse.Model = meta.ActualModelName
+	completionTokens := openai.CountTokenText(geminiResponse.GetResponseText(meta), meta.ActualModelName)
 	usage := relaymodel.Usage{
-		PromptTokens:     promptTokens,
+		PromptTokens:     meta.PromptTokens,
 		CompletionTokens: completionTokens,
-		TotalTokens:      promptTokens + completionTokens,
+		TotalTokens:      meta.PromptTokens + completionTokens,
 	}
 	fullTextResponse.Usage = usage
 	jsonResponse, err := json.Marshal(fullTextResponse)
@@ -583,3 +617,276 @@ func FileHandler(c *gin.Context, url string) (error, string, string) {
 
 	return nil, contentType, file.URI
 }
+
+// func GetGenaiByContent(c *gin.Context, meta *meta.Meta, textRequest relaymodel.GeneralOpenAIRequest) (*ChatRequest, error) {
+// 	//初始化gemini客户端
+// 	client, err := genai.NewClient(c, option.WithAPIKey(meta.APIKey))
+// 	if err != nil {
+// 		return fmt.Errorf("init genai error: %s", err.Error()), "", ""
+// 	}
+// 	defer client.Close()
+// 	model := client.GenerativeModel(meta.OriginModelName)
+// 	if len(textRequest.Messages) == 1 {
+// 		var msg = textRequest.Messages[0].StringContent()
+// 		if meta.IsStream {
+// 			geminiRequest.Contents[0].Parts
+// 			iter := model.GenerateContentStream(c, genai.Text(""))
+// 			model
+// 		}
+// 	}
+// 	// for i := 0; i < len(geminiRequest.Contents); i++ {
+// 	// 	if i == (len(geminiRequest.Contents) - 1) {
+// 	// 		//最后一个拿来提出问题
+
+// 	// 	}
+// 	// 	cs := model.StartChat()
+
+// 	// 	cs.History = []*genai.Content{
+// 	// 		{
+// 	// 			Parts: []genai.Part{
+// 	// 				genai.Text("Hello, I have 2 dogs in my house."),
+// 	// 			},
+// 	// 			Role: "user",
+// 	// 		},
+// 	// 		{
+// 	// 			Parts: []genai.Part{
+// 	// 				genai.Text("Great to meet you. What would you like to know?"),
+// 	// 			},
+// 	// 			Role: "model",
+// 	// 		},
+// 	// 	}
+// 	// }
+// 	model.SafetySettings = []*genai.SafetySetting{
+// 		{
+// 			Category:  genai.HarmCategoryDangerousContent,
+// 			Threshold: genai.HarmBlockNone,
+// 		},
+// 		{
+// 			Category:  genai.HarmCategoryHarassment,
+// 			Threshold: genai.HarmBlockNone,
+// 		},
+// 		{
+// 			Category:  genai.HarmCategoryHateSpeech,
+// 			Threshold: genai.HarmBlockNone,
+// 		},
+// 		{
+// 			Category:  genai.HarmCategorySexuallyExplicit,
+// 			Threshold: genai.HarmBlockNone,
+// 		},
+// 	}
+// 	if textRequest.Temperature != nil {
+// 		model.SetTemperature(float32(*textRequest.Temperature))
+// 	}
+// 	if textRequest.TopP != nil {
+// 		model.SetTopP(float32(*textRequest.TopP))
+// 	}
+// 	if textRequest.Stop != nil {
+// 		seq, ok := textRequest.Stop.([]string)
+// 		if !ok {
+// 			seq, ok := textRequest.Stop.(string)
+// 			if ok {
+// 				model.StopSequences = []string{
+// 					seq,
+// 				}
+// 			}
+// 		} else {
+// 			model.StopSequences = seq
+// 		}
+// 	}
+// 	if textRequest.MaxTokens != 0 {
+// 		model.SetMaxOutputTokens(int32(textRequest.MaxTokens))
+// 	}
+// 	if textRequest.ResponseFormat != nil {
+// 		if mimeType, ok := mimeTypeMap[textRequest.ResponseFormat.Type]; ok {
+// 			model.ResponseMIMEType = mimeType
+// 		}
+// 		if textRequest.ResponseFormat.Schema != nil {
+// 			model.ResponseSchema = &genai.Schema{
+// 				Type:        genai.TypeArray,
+// 				Format:      textRequest.ResponseFormat.Schema.Format,
+// 				Description: textRequest.ResponseFormat.Schema.Description,
+// 				Nullable:    textRequest.ResponseFormat.Schema.Nullable,
+// 				Enum:        textRequest.ResponseFormat.Schema.Enum,
+// 				Required:    textRequest.ResponseFormat.Schema.Required,
+// 			}
+// 			model.ResponseMIMEType = mimeTypeMap["json_object"]
+// 		}
+// 	}
+// 	var tools []*genai.Tool
+// 	if textRequest.Tools != nil {
+// 		for _, tool := range textRequest.Tools {
+// 			if params, ok := tool.Function.Parameters.(genai.Schema); ok {
+
+// 			}
+// 			tools = append(tools, &genai.Tool{FunctionDeclarations: []*genai.FunctionDeclaration{
+// 				{
+// 					Name:        tool.Function.Name,
+// 					Description: tool.Function.Description,
+// 					Parameters:  tool.Function.Parameters,
+// 				},
+// 			}})
+// 		}
+// 	}
+// 	tools := []*genai.Tool{
+// 		&genai.Tool{FunctionDeclarations: []*genai.FunctionDeclaration{
+// 			{Name: "add"},
+// 			{Name: "subtract"},
+// 			{Name: "multiply"},
+// 			{Name: "divide"},
+// 		}}}
+
+// 	model.Tools = tools
+
+// 	if textRequest.Tools != nil {
+// 		functions := make([]relaymodel.Function, 0, len(textRequest.Tools))
+// 		for _, tool := range textRequest.Tools {
+// 			functions = append(functions, tool.Function)
+// 		}
+// 		geminiRequest.Tools = []ChatTools{
+// 			{
+// 				FunctionDeclarations: functions,
+// 			},
+// 		}
+// 	} else if textRequest.Functions != nil {
+// 		geminiRequest.Tools = []ChatTools{
+// 			{
+// 				FunctionDeclarations: textRequest.Functions,
+// 			},
+// 		}
+// 	}
+// 	nextRole := "user"
+// 	for k, message := range textRequest.Messages {
+// 		msg := message.StringContent()
+// 		if msg == "" {
+// 			b, jerr := json.Marshal(textRequest)
+// 			if jerr == nil {
+// 				logger.SysLog(fmt.Sprintf("Gemini-Text-Empty: %s", string(b)))
+// 			}
+// 			msg = "Hi"
+// 		}
+// 		content := ChatContent{
+// 			Role: message.Role,
+// 			Parts: []Part{
+// 				{
+// 					Text: msg,
+// 				},
+// 			},
+// 		}
+// 		openaiContent := message.ParseContent()
+// 		var parts []Part
+// 		imageNum := 0
+// 		for _, part := range openaiContent {
+// 			if part.Type == relaymodel.ContentTypeText {
+// 				msg = part.Text
+// 				if msg == "" {
+// 					msg = "Hi"
+// 				}
+// 				parts = append(parts, Part{
+// 					Text: msg,
+// 				})
+// 			} else if part.Type == relaymodel.ContentTypeImageURL {
+// 				imageNum += 1
+// 				if imageNum > VisionMaxImageNum {
+// 					continue
+// 				}
+// 				mimeType := ""
+// 				fileData := ""
+// 				var err error
+// 				ok, err := video.IsVideoUrl(part.ImageURL.Url)
+// 				if err != nil {
+// 					return nil, err
+// 				}
+// 				if ok {
+// 					err, mimeType, fileData = FileHandler(c, part.ImageURL.Url)
+// 					if err != nil {
+// 						return nil, err
+// 					}
+// 					parts = append(parts, Part{
+// 						FileData: &FileData{
+// 							MimeType: mimeType,
+// 							Uri:      fileData,
+// 						},
+// 					})
+// 				} else {
+// 					mimeType, fileData, err = image.GetImageFromUrl(part.ImageURL.Url)
+// 					if err != nil {
+// 						return nil, err
+// 					}
+// 					parts = append(parts, Part{
+// 						InlineData: &InlineData{
+// 							MimeType: mimeType,
+// 							Data:     fileData,
+// 						},
+// 					})
+// 				}
+
+// 			}
+// 		}
+// 		content.Parts = parts
+
+// 		// there's cannt start with assistant role
+// 		if content.Role == "assistant" && k == 0 {
+// 			geminiRequest.Contents = append(geminiRequest.Contents, ChatContent{
+// 				Role: "user",
+// 				Parts: []Part{
+// 					{
+// 						Text: "Hello",
+// 					},
+// 				},
+// 			})
+// 			nextRole = "model"
+// 		}
+
+// 		// there's no assistant role in gemini and API shall vomit if Role is not user or model
+// 		if content.Role == "assistant" || content.Role == "system" {
+// 			content.Role = "model"
+// 		}
+// 		// per chat need gemini-user
+// 		if (content.Role == "model" || content.Role == "system" || content.Role == "assistant") && nextRole == "user" {
+// 			geminiRequest.Contents = append(geminiRequest.Contents, ChatContent{
+// 				Role: "user",
+// 				Parts: []Part{
+// 					{
+// 						Text: "Hello",
+// 					},
+// 				},
+// 			})
+// 			nextRole = "model"
+// 		} else if content.Role == "user" && nextRole == "model" {
+// 			geminiRequest.Contents = append(geminiRequest.Contents, ChatContent{
+// 				Role: "model",
+// 				Parts: []Part{
+// 					{
+// 						Text: "Hi",
+// 					},
+// 				},
+// 			})
+// 			nextRole = "user"
+// 		}
+
+// 		geminiRequest.Contents = append(geminiRequest.Contents, content)
+
+// 		if content.Role == "user" {
+// 			nextRole = "model"
+// 		} else {
+// 			nextRole = "user"
+// 		}
+// 	}
+// 	if nextRole == "user" {
+// 		geminiRequest.Contents = append(geminiRequest.Contents, ChatContent{
+// 			Role: "user",
+// 			Parts: []Part{
+// 				{
+// 					Text: "Hello",
+// 				},
+// 			},
+// 		})
+// 	}
+
+// 	// b, jerr := json.Marshal(geminiRequest)
+// 	// if jerr == nil {
+// 	// 	logger.SysLog(fmt.Sprintf("Gemini-Data.: %s", string(b)))
+// 	// }
+
+// 	return &geminiRequest, nil
+// }
