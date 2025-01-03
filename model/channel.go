@@ -252,13 +252,13 @@ func DeleteDisabledChannel() (int64, error) {
 // 激活渠道
 func ActivateChannel(limit int64) bool {
 	var data []map[string]interface{}
-	err := DB.Model(&Channel{}).Select("`type`, `group`, count(1) as count").Group("`type`, `group`").Where("status = ? Or status = ? ", ChannelStatusEnabled, ChannelStatusSleeping).Scan(&data).Error
+	err := DB.Model(&Channel{}).Select(fmt.Sprintf("`type`, `group`, sum(if(`status`= %d or `status`=%d,1,0)) as num", ChannelStatusEnabled, ChannelStatusSleeping)).Group("`type`, `group`").Scan(&data).Error
 	if err != nil {
 		logger.SysErrorf("ActivateChannel - failed to scan channel status: %s", err)
 		return false
 	}
 	for _, record := range data {
-		num := record["count"].(int64)
+		num := record["num"].(int64)
 		t := record["type"].(int64)
 		g := record["group"].(string)
 		if num < limit {

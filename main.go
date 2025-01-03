@@ -90,9 +90,11 @@ func main() {
 	if config.EnableMetric {
 		logger.SysLog("metric enabled, will disable channel if too much request failed")
 	}
+	if os.Getenv("AUTO_ACTIVATE_CHANNEL") == "true" {
+		go monitor.AutoActivate(10)
+	}
 	go monitor.WakeupChannel(config.SyncFrequency)
 	go monitor.AutoDelFile(config.SyncFrequency)
-	go monitor.AutoActivate(10)
 	openai.InitTokenEncoders()
 	client.Init()
 
