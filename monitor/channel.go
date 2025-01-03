@@ -82,7 +82,6 @@ func EnableChannel(channelId int, channelName string) {
 // 渠道唤醒
 func WakeupChannel(frequency int) {
 	for {
-		time.Sleep(time.Duration(frequency) * time.Second)
 		logger.SysLog("begining wakeup channel")
 		ids, err := model.WakeupChannel()
 		if err != nil {
@@ -94,6 +93,7 @@ func WakeupChannel(frequency int) {
 			logger.SysLog(fmt.Sprintf("已唤醒休眠渠道: %d 个", len(ids)))
 		}
 		logger.SysLog("wakeup channel end")
+		time.Sleep(time.Duration(frequency) * time.Second)
 	}
 }
 
