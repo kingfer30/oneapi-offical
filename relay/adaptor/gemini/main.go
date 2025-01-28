@@ -62,6 +62,10 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 				Category:  "HARM_CATEGORY_DANGEROUS_CONTENT",
 				Threshold: config.GeminiSafetySetting,
 			},
+			{
+				Category:  "HARM_CATEGORY_CIVIC_INTEGRITY",
+				Threshold: config.GeminiSafetySetting,
+			},
 		},
 		GenerationConfig: ChatGenerationConfig{
 			Temperature:     textRequest.Temperature,
