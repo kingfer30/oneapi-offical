@@ -121,6 +121,7 @@ var ModelRatio = map[string]float64{
 	"gemini-2.0-flash-thinking-exp":       1,
 	"gemini-2.0-flash-thinking-exp-01-21": 1,
 	"gemini-2.0-flash-lite-preview-02-05": 1,
+	"gemini-2.0-pro-exp-02-05":            1,
 	"aqa":                                 1,
 	// https://open.bigmodel.cn/pricing
 	"glm-4":         0.1 * RMB,
