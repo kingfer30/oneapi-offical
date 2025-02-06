@@ -29,6 +29,8 @@ var ModelList = []string{
 	"gemini-exp-1114",
 	"gemini-exp-1206",
 	"learnlm-1.5-pro-experimental",
+	"gemini-2.0-flash",
+	"gemini-2.0-flash-001",
 	"gemini-2.0-flash-exp",
 	"gemini-2.0-flash-thinking-exp",
 	"gemini-2.0-flash-thinking-exp-1219",
