@@ -113,34 +113,34 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 		return nil, fmt.Errorf("do request failed: %w", err)
 	}
 
-	if resp.StatusCode == http.StatusTooManyRequests {
-		//429 直接发起再次重试
-		var retryNum = 5
-		for {
-			if retryNum == 0 {
-				logger.SysLogf("触发429, 重试失败: %s , ChannelId: %d, %s", meta.APIKey, meta.ChannelId, string(bodyData))
-				break
-			}
-			retryNum--
-			requestBody = bytes.NewBuffer(bodyData)
-			req, err = http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
-			if err != nil {
-				return nil, fmt.Errorf("new request failed: %w", err)
-			}
-			err = a.SetupRequestHeader(c, req, meta)
-			if err != nil {
-				return nil, fmt.Errorf("setup request header failed: %w", err)
-			}
-			resp, err = doRequest(c, req)
-			if err != nil {
-				return nil, fmt.Errorf("do request failed: %w", err)
-			}
-			if resp.StatusCode != http.StatusTooManyRequests {
-				logger.SysLogf("触发429, 重试成功: %s , 剩余次数: %d, %s", meta.APIKey, retryNum, string(bodyData))
-				break
-			}
-		}
-	}
+	// if resp.StatusCode == http.StatusTooManyRequests {
+	// 	//429 直接发起再次重试
+	// 	var retryNum = 5
+	// 	for {
+	// 		if retryNum == 0 {
+	// 			logger.SysLogf("触发429, 重试失败: %s , ChannelId: %d, %s", meta.APIKey, meta.ChannelId, string(bodyData))
+	// 			break
+	// 		}
+	// 		retryNum--
+	// 		requestBody = bytes.NewBuffer(bodyData)
+	// 		req, err = http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
+	// 		if err != nil {
+	// 			return nil, fmt.Errorf("new request failed: %w", err)
+	// 		}
+	// 		err = a.SetupRequestHeader(c, req, meta)
+	// 		if err != nil {
+	// 			return nil, fmt.Errorf("setup request header failed: %w", err)
+	// 		}
+	// 		resp, err = doRequest(c, req)
+	// 		if err != nil {
+	// 			return nil, fmt.Errorf("do request failed: %w", err)
+	// 		}
+	// 		if resp.StatusCode != http.StatusTooManyRequests {
+	// 			logger.SysLogf("触发429, 重试成功: %s , 剩余次数: %d, %s", meta.APIKey, retryNum, string(bodyData))
+	// 			break
+	// 		}
+	// 	}
+	// }
 	return resp, nil
 }
 func doRequest(c *gin.Context, req *http.Request) (*http.Response, error) {
@@ -148,7 +148,6 @@ func doRequest(c *gin.Context, req *http.Request) (*http.Response, error) {
 	if config.HttpProxy == "" {
 		client = commonClient.HTTPClient
 	} else {
-		logger.SysLogf("使用代理: %s ", config.HttpProxy)
 		url, err := url.Parse(config.HttpProxy)
 		if err != nil {
 			return nil, fmt.Errorf("url.Parse failed: %w", err)
