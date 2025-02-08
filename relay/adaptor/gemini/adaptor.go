@@ -176,8 +176,10 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 	}
 	if meta.IsStream {
 		var responseText string
-		err, responseText = StreamHandler(c, resp, meta)
-		usage = openai.ResponseText2Usage(responseText, meta.ActualModelName, meta.PromptTokens)
+		err, responseText, usage = StreamHandler(c, resp, meta)
+		if usage.PromptTokens == 0 || usage.TotalTokens == 0 {
+			usage = openai.ResponseText2Usage(responseText, meta.ActualModelName, meta.PromptTokens)
+		}
 	} else {
 		switch meta.Mode {
 		case relaymode.Embeddings:

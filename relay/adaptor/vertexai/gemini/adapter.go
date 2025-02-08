@@ -35,8 +35,10 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Meta) (usage *model.Usage, err *model.ErrorWithStatusCode) {
 	if meta.IsStream {
 		var responseText string
-		err, responseText = gemini.StreamHandler(c, resp, meta)
-		usage = openai.ResponseText2Usage(responseText, meta.ActualModelName, meta.PromptTokens)
+		err, responseText, usage = gemini.StreamHandler(c, resp, meta)
+		if usage.PromptTokens == 0 || usage.TotalTokens == 0 {
+			usage = openai.ResponseText2Usage(responseText, meta.ActualModelName, meta.PromptTokens)
+		}
 	} else {
 		switch meta.Mode {
 		case relaymode.Embeddings:

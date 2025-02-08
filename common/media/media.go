@@ -1,4 +1,4 @@
-package video
+package media
 
 import (
 	"bufio"
@@ -20,25 +20,25 @@ import (
 
 var CacheSecond int64 = 600
 
-type VideoCache struct {
-	IsVideo     bool   `json:"is_video"`
+type MediaCache struct {
+	IsMedia     bool   `json:"is_media"`
 	ContentType string `json:"content_type"`
 	Path        string `json:"path"`
 }
 
-func setVideoCache(url string, IsVideo bool, contentType string, path string) {
-	var cache *VideoCache
-	result, err := common.RedisHashGet("video_url", random.StrToMd5(url))
+func setMediaCache(url string, IsMedia bool, contentType string, path string) {
+	var cache *MediaCache
+	result, err := common.RedisHashGet("media_url", random.StrToMd5(url))
 	if err == nil {
 		err = json.Unmarshal([]byte(result), &cache)
 		if err != nil {
-			cache = &VideoCache{
-				IsVideo: IsVideo,
+			cache = &MediaCache{
+				IsMedia: IsMedia,
 			}
 		}
 	} else {
-		cache = &VideoCache{
-			IsVideo: IsVideo,
+		cache = &MediaCache{
+			IsMedia: IsMedia,
 		}
 	}
 	if contentType != "" && cache.ContentType != contentType {
@@ -47,24 +47,24 @@ func setVideoCache(url string, IsVideo bool, contentType string, path string) {
 	if path != "" && cache.Path != path {
 		cache.Path = path
 	}
-	common.RedisHashSet("video_url", random.StrToMd5(url), cache, CacheSecond)
+	common.RedisHashSet("media_url", random.StrToMd5(url), cache, CacheSecond)
 }
 
-func IsVideoUrl(url string) (bool, error) {
+func IsMediaUrl(url string) (bool, error) {
 	if !strings.HasPrefix(url, "http") && !strings.HasPrefix(url, "https") {
 		//url no check
 		return false, nil
 	}
-	videoRegex := regexp.MustCompile(`(mp4|mov|mpeg|mpg|webm|wmv|3gpp|avi|x-flv)$`)
-	if videoRegex.MatchString(url) {
+	mediaRegex := regexp.MustCompile(`(mp4|mov|mpeg|mpg|webm|wmv|3gpp|avi|x-flv|pdf|wav|mp3|aiff|aac|ogg|flac)$`)
+	if mediaRegex.MatchString(url) {
 		return true, nil
 	}
-	var cache *VideoCache
-	result, err := common.RedisHashGet("video_url", random.StrToMd5(url))
+	var cache *MediaCache
+	result, err := common.RedisHashGet("media_url", random.StrToMd5(url))
 	if err == nil {
 		err = json.Unmarshal([]byte(result), &cache)
 		if err == nil {
-			return cache.IsVideo, nil
+			return cache.IsMedia, nil
 		}
 	}
 	resp, err := client.UserContentRequestHTTPClient.Get(url)
@@ -72,25 +72,25 @@ func IsVideoUrl(url string) (bool, error) {
 		//先改为正常请求, 再次报错再进行异常抛出
 		resp, err = client.HTTPClient.Get(url)
 		if err != nil {
-			logger.SysLogf("IsVideoUrl - faild again:  %s", err)
-			setVideoCache(url, false, "", "")
+			logger.SysLogf("IsMediaUrl - faild again:  %s", err)
+			setMediaCache(url, false, "", "")
 			return false, fmt.Errorf("failed to get this url : %s, err: %s", url, err)
 		}
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		setVideoCache(url, false, "", "")
+		setMediaCache(url, false, "", "")
 		return false, fmt.Errorf("failed to get this url : %s, status : %s", url, resp.Status)
 	}
 	contentType := resp.Header.Get("Content-Type")
-	setVideoCache(url, videoRegex.MatchString(contentType), contentType, "")
-	return videoRegex.MatchString(contentType), nil
+	setMediaCache(url, mediaRegex.MatchString(contentType), contentType, "")
+	return mediaRegex.MatchString(contentType), nil
 }
 
 // 保存客户上传的多媒体文件
 func SaveMediaByUrl(url string) (error, string, string) {
-	var cache *VideoCache
-	result, err := common.RedisHashGet("video_url", random.StrToMd5(url))
+	var cache *MediaCache
+	result, err := common.RedisHashGet("media_url", random.StrToMd5(url))
 	if err == nil {
 		err = json.Unmarshal([]byte(result), &cache)
 		if err == nil {
@@ -102,8 +102,12 @@ func SaveMediaByUrl(url string) (error, string, string) {
 		//先改为正常请求, 再次报错再进行异常抛出
 		resp, err = client.HTTPClient.Get(url)
 		if err != nil {
-			logger.SysLogf("GetVideoUrl - faild again:  %s", err)
-			return fmt.Errorf("failed to get this url : %s, status : %s, err: %s", url, resp.Status, err), "", ""
+			logger.SysLogf("GetMediaUrl - faild again:  %s", err)
+			if resp == nil {
+				return fmt.Errorf("failed to get this url : %s, resp为空, err: %s", url, err), "", ""
+			} else {
+				return fmt.Errorf("failed to get this url : %s, status : %s, err: %s", url, resp.Status, err), "", ""
+			}
 		}
 	}
 	defer resp.Body.Close()
@@ -131,6 +135,9 @@ func SaveMediaByUrl(url string) (error, string, string) {
 		if len(list) > 1 {
 			extension = list[0]
 		}
+	}
+	if contentType == "audio/mpeg" {
+		contentType = "audio/mp3"
 	}
 
 	// 创建临时文件
@@ -185,7 +192,7 @@ func SaveMediaByUrl(url string) (error, string, string) {
 		return err, "", ""
 	}
 	logger.SysLogf("SaveMediaByUrl - url: %s, save-path: %s, file_name: %s, content-type: %s,file-size: %d", url, tmp_name, tempFile.Name(), contentType, fileInfo.Size())
-	setVideoCache(url, true, contentType, tempFile.Name())
+	setMediaCache(url, true, contentType, tempFile.Name())
 	return nil, contentType, tempFile.Name()
 }
 
@@ -193,16 +200,23 @@ func SaveMediaByUrl(url string) (error, string, string) {
 func CheckLegalUrl(apiType int, contentType string) (string, error) {
 	if apiType == apitype.Gemini {
 		switch contentType {
-		case "image/jpeg":
-			return "jpeg", nil
-		case "image/png":
-			return "png", nil
-		case "image/webp":
-			return "webp", nil
-		case "image/heic":
-			return "heic", nil
-		case "image/heif":
-			return "heif", nil
+		//pdf
+		case "application/pdf":
+			return "pdf", nil
+		//音频
+		case "audio/wav":
+			return "wav", nil
+		case "audio/mp3":
+			return "mp3", nil
+		case "audio/aiff":
+			return "aiff", nil
+		case "audio/aac":
+			return "aac", nil
+		case "audio/ogg":
+			return "ogg", nil
+		case "audio/flac":
+			return "flac", nil
+		//视频
 		case "video/mp4":
 			return "mp4", nil
 		case "video/mpeg":

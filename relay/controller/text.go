@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/songquanpeng/one-api/common/config"
 	"io"
 	"net/http"
+
+	"github.com/songquanpeng/one-api/common/config"
 
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common/logger"
@@ -43,7 +44,13 @@ func RelayTextHelper(c *gin.Context) *model.ErrorWithStatusCode {
 	groupRatio := billingratio.GetGroupRatio(meta.Group)
 	ratio := modelRatio * groupRatio
 	// pre-consume quota
-	promptTokens := getPromptTokens(textRequest, meta.Mode)
+	var promptTokens int
+	//gemini不作计算了, 为了不触发token_counter
+	if meta.APIType == apitype.Gemini {
+		promptTokens = 0
+	} else {
+		promptTokens = getPromptTokens(textRequest, meta.Mode)
+	}
 	meta.PromptTokens = promptTokens
 	preConsumedQuota, bizErr := preConsumeQuota(ctx, textRequest, promptTokens, ratio, meta)
 	if bizErr != nil {

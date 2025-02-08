@@ -81,3 +81,31 @@ type ChatGenerationConfig struct {
 	CandidateCount   int      `json:"candidateCount,omitempty"`
 	StopSequences    any      `json:"stopSequences,omitempty"`
 }
+
+type ChatCandidate struct {
+	Content       ChatContent        `json:"content"`
+	FinishReason  string             `json:"finishReason"`
+	Index         int64              `json:"index"`
+	SafetyRatings []ChatSafetyRating `json:"safetyRatings"`
+}
+
+type ChatSafetyRating struct {
+	Category    string `json:"category"`
+	Probability string `json:"probability"`
+}
+
+type ChatPromptFeedback struct {
+	SafetyRatings []ChatSafetyRating `json:"safetyRatings"`
+}
+
+type ChatResponse struct {
+	Candidates     []ChatCandidate    `json:"candidates"`
+	PromptFeedback ChatPromptFeedback `json:"promptFeedback"`
+	UsageMetadata  *UsageMetaData     `json:"usageMetadata"`
+	ModelVersion   string             `json:"modelVersion"`
+}
+type UsageMetaData struct {
+	PromptTokenCount     int `json:"promptTokenCount"`
+	CandidatesTokenCount int `json:"candidatesTokenCount"`
+	TotalTokenCount      int `json:"totalTokenCount"`
+}

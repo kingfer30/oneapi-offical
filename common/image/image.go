@@ -130,6 +130,10 @@ func getImageFormat(input string) (string, string, error) {
 		input = strings.TrimPrefix(input, "data:image/webp;base64,")
 	} else if strings.HasPrefix(input, "data:image/gif;base64,") {
 		input = strings.TrimPrefix(input, "data:image/gif;base64,")
+	} else if strings.HasPrefix(input, "data:image/heic;base64,") {
+		input = strings.TrimPrefix(input, "data:image/heic;base64,")
+	} else if strings.HasPrefix(input, "data:image/heif;base64,") {
+		input = strings.TrimPrefix(input, "data:image/;base64,")
 	}
 	input = strings.TrimSpace(input)
 
@@ -165,17 +169,14 @@ func getImageFormat(input string) (string, string, error) {
 
 func GetImageFromUrl(url string) (mimeType string, data string, err error) {
 	// Check if the URL is a base64
-	logger.SysLog("Vision-Image-Format Checking...")
 	imgType, imgData, err := getImageFormat(url)
 
 	if err == nil && imgType != "" {
 		// URL is a data URL
-		logger.SysLog(fmt.Sprintf("Vision-Base64 Yes ! %s", imgType))
 		mimeType = "image/" + imgType
 		data = imgData
 		return mimeType, data, nil
 	}
-	logger.SysLog(fmt.Sprintf("Vision-Url Yes ! %s", url))
 	isImage, err := IsImageUrl(url)
 	if !isImage {
 		return "", "", fmt.Errorf("failed to get this url : it may not an image")

@@ -90,6 +90,44 @@ func RedisSetNx(key string, value string, expiration time.Duration) (bool, error
 	return RDB.SetNX(ctx, key, value, expiration).Result()
 }
 
+func RedisRpush(key string, value string) error {
+	ctx := context.Background()
+	return RDB.RPush(ctx, key, value).Err()
+}
+
+func RedisLPop(key string) (string, error) {
+	ctx := context.Background()
+	return RDB.LPop(ctx, key).Result()
+}
+
+func RedisSadd(key string, value string, expiration time.Duration) error {
+	ctx := context.Background()
+	_, err := RDB.SAdd(ctx, key, value, expiration).Result()
+	if err != nil {
+		return err
+	}
+	return RDB.Expire(ctx, key, expiration).Err()
+}
+func RedisZadd(key string, value string, score float64, expiration time.Duration) error {
+	ctx := context.Background()
+	_, err := RDB.ZAdd(ctx, key, &redis.Z{
+		Score:  score,
+		Member: value,
+	}).Result()
+	if err != nil {
+		return err
+	}
+	return RDB.Expire(ctx, key, expiration).Err()
+}
+func RedisZdel(key string, value []string) (int64, error) {
+	ctx := context.Background()
+	return RDB.ZRem(ctx, key, value).Result()
+}
+func RedisZRangeByScore(key string, count int, opt *redis.ZRangeBy) ([]string, error) {
+	ctx := context.Background()
+	return RDB.ZRangeByScore(ctx, key, opt).Result()
+}
+
 func RedisHashSet(key string, field string, value any, expiration int64) error {
 	ctx := context.Background()
 	jsonBytes, err := json.Marshal(value)
