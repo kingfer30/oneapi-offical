@@ -409,6 +409,7 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relay
 		}
 		data = strings.TrimPrefix(data, "data: ")
 		data = strings.TrimSuffix(data, "\"")
+
 		var geminiResponse ChatResponse
 		err := json.Unmarshal([]byte(data), &geminiResponse)
 		if err != nil {
@@ -427,6 +428,7 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relay
 			CompletionTokens: geminiResponse.UsageMetadata.CandidatesTokenCount,
 			TotalTokens:      geminiResponse.UsageMetadata.TotalTokenCount,
 		}
+		response.Usage = usage
 
 		err = render.ObjectData(c, response)
 		if err != nil {
