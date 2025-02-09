@@ -41,6 +41,9 @@ type Channel struct {
 	Group              string  `json:"group" gorm:"type:varchar(32);default:'default'"`
 	ModelMapping       *string `json:"model_mapping" gorm:"type:varchar(1024);default:''"`
 	SystemPrompt       *string `json:"system_prompt" gorm:"type:text"`
+	RpmLimit           int     `json:"rpm_limit" gorm:"default:0"`
+	DpmLimit           int     `json:"dpm_limit" gorm:"default:0"`
+	TpmLimit           int     `json:"tpm_limit" gorm:"default:0"`
 }
 
 type ChannelConfig struct {

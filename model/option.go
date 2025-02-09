@@ -99,6 +99,8 @@ func SyncOptions(frequency int) {
 		time.Sleep(time.Duration(frequency) * time.Second)
 		logger.SysLog("syncing options from database")
 		loadOptionsFromDatabase()
+		InitGroupInfo()
+		logger.SysLog("synced options from database")
 	}
 }
 

@@ -347,6 +347,8 @@ var CompletionRatio = map[string]float64{
 var (
 	DefaultModelRatio      map[string]float64
 	DefaultCompletionRatio map[string]float64
+	GroupModels = make(map[string]string)
+	GroupModelsRatio = make(map[string]map[string]float64)
 )
 
 func init() {

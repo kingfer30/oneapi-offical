@@ -5,16 +5,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/songquanpeng/one-api/common"
-	"github.com/songquanpeng/one-api/common/config"
-	"github.com/songquanpeng/one-api/common/logger"
-	"github.com/songquanpeng/one-api/common/random"
 	"math/rand"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/songquanpeng/one-api/common"
+	"github.com/songquanpeng/one-api/common/config"
+	"github.com/songquanpeng/one-api/common/logger"
+	"github.com/songquanpeng/one-api/common/random"
 )
 
 var (
@@ -150,13 +151,13 @@ func CacheIsUserEnabled(userId int) (bool, error) {
 
 func CacheGetGroupModels(ctx context.Context, group string) ([]string, error) {
 	if !common.RedisEnabled {
-		return GetGroupModels(ctx, group)
+		return GetGroupModels(group)
 	}
 	modelsStr, err := common.RedisGet(fmt.Sprintf("group_models:%s", group))
 	if err == nil {
 		return strings.Split(modelsStr, ","), nil
 	}
-	models, err := GetGroupModels(ctx, group)
+	models, err := GetGroupModels(group)
 	if err != nil {
 		return nil, err
 	}
@@ -215,6 +216,27 @@ func InitChannelCache() {
 	channelSyncLock.Unlock()
 	logger.SysLog("channels synced from database")
 }
+
+// func InitChannelCacheByRedis() {
+// 	logger.SysLog("apikeys cache begining")
+
+// 	var channels []*Channel
+// 	DB.Where("status = ?", ChannelStatusEnabled).Find(&channels)
+
+// 	common.RedisDel("apikeys:*")
+// 	var timeout = time.Duration(common.KeyCacheTimeout) * time.Second
+// 	for _, channel := range channels {
+// 		groups := strings.Split(channel.Group, ",")
+// 		for _, group := range groups {
+// 			models := strings.Split(channel.Models, ",")
+// 			for _, model := range models {
+// 				key := fmt.Sprintf("apikeys:%s:%s", group, model)
+// 				common.RedisZadd(key, strconv.Itoa(channel.Id), float64(*channel.Priority), timeout)
+// 			}
+// 		}
+// 	}
+// 	logger.SysLog("apikeys cache end")
+// }
 
 func SyncChannelCache(frequency int) {
 	for {
