@@ -265,11 +265,11 @@ func ActivateChannel(limit int64) bool {
 		t := record["type"].(int64)
 		g := record["group"].(string)
 		l := GroupInfo[g].ActiveNum
-		if l != 0 {
-			limit = l
+		if l == 0 {
+			l = limit
 		}
-		if num < limit {
-			actNum := limit - num
+		if num < l {
+			actNum := l - num 
 			res := DB.Model(&Channel{}).Where("`type` = ? and `status` = ? and `group` = ?", t, ChannelStatusUnActivate, g).Limit(int(actNum)).Updates(Channel{
 				Status: ChannelStatusEnabled,
 			})

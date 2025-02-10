@@ -14,7 +14,7 @@ type Group struct {
 	Name        string `json:"name" gorm:"index"`
 	Models      string `json:"models"`
 	Ratio       string `json:"ratio"`
-	ActiveNum   int64  `json:"active_num"`
+	ActiveNum   int64  `json:"active_num" gorm:"default:0"`
 	Status      int    `json:"status" gorm:"default:1;index:idx_status"`
 	CreatedTime int64  `json:"created_time" gorm:"bigint"`
 }
