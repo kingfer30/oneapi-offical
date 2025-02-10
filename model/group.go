@@ -10,18 +10,27 @@ import (
 
 type Group struct {
 	Id          int    `json:"id"`
-	Type        int    `json:"type" gorm:"default:0"`
+	Type        string `json:"type" gorm:"default:''"`
 	Name        string `json:"name" gorm:"index"`
 	Models      string `json:"models"`
 	Ratio       string `json:"ratio"`
+	ActiveNum   int64  `json:"active_num"`
 	Status      int    `json:"status" gorm:"default:1;index:idx_status"`
 	CreatedTime int64  `json:"created_time" gorm:"bigint"`
 }
 
+var GroupModels = make(map[string]string)
+var GroupInfo = make(map[string]*Group)
+
 func InitGroupInfo() {
 	groups, _ := GetAllGroups()
 	for _, group := range groups {
-		billingratio.GroupModels[group.Name] = fmt.Sprintf(",%s,", group.Models)
+		GroupModels[group.Name] = fmt.Sprintf(",%s,", group.Models)
+		GroupInfo[group.Name] = &Group{
+			Id:        group.Id,
+			Type:      group.Type,
+			ActiveNum: group.ActiveNum,
+		}
 		tmp := make(map[string]float64)
 		err := json.Unmarshal([]byte(group.Ratio), &tmp)
 		if err == nil {

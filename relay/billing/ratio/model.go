@@ -347,8 +347,7 @@ var CompletionRatio = map[string]float64{
 var (
 	DefaultModelRatio      map[string]float64
 	DefaultCompletionRatio map[string]float64
-	GroupModels = make(map[string]string)
-	GroupModelsRatio = make(map[string]map[string]float64)
+	GroupModelsRatio       = make(map[string]map[string]float64)
 )
 
 func init() {
@@ -395,12 +394,20 @@ func UpdateModelRatioByJSONString(jsonStr string) error {
 	return json.Unmarshal([]byte(jsonStr), &ModelRatio)
 }
 
-func GetModelRatio(name string, channelType int) float64 {
+func GetModelRatio(name string, channelType int, group string) float64 {
+	var ratio float64
 	if strings.HasPrefix(name, "qwen-") && strings.HasSuffix(name, "-internet") {
 		name = strings.TrimSuffix(name, "-internet")
 	}
 	if strings.HasPrefix(name, "command-") && strings.HasSuffix(name, "-internet") {
 		name = strings.TrimSuffix(name, "-internet")
+	}
+	gmRatio, ok := GroupModelsRatio[group]
+	if ok {
+		ratio, ok = gmRatio[name]
+		if ok {
+			return ratio
+		}
 	}
 	model := fmt.Sprintf("%s(%d)", name, channelType)
 	if ratio, ok := ModelRatio[model]; ok {

@@ -21,7 +21,7 @@ func Distribute() func(c *gin.Context) {
 		userId := c.GetInt(ctxkey.Id)
 		userGroup, _ := model.CacheGetUserGroup(userId)
 		c.Set(ctxkey.Group, userGroup)
-		var requestModel string
+		requestModel := c.GetString(ctxkey.RequestModel)
 		var channel *model.Channel
 		channelId, ok := c.Get(ctxkey.SpecificChannelId)
 		if ok {
@@ -40,7 +40,6 @@ func Distribute() func(c *gin.Context) {
 				return
 			}
 		} else {
-			requestModel = c.GetString(ctxkey.RequestModel)
 			var err error
 			channel, err = model.CacheGetRandomSatisfiedChannel(userGroup, requestModel, false)
 			if err != nil {
