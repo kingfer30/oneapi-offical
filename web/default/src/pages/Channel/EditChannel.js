@@ -549,7 +549,7 @@ const EditChannel = () => {
               <Form.Input
                 label='Api Version'
                 name='api_version'
-                placeholder={'v1和v1beta, 默认空'}
+                placeholder={'v1, v1beta, v1alpha, 默认空'}
                 onChange={handleConfigChange}
                 value={config.api_version}
                 autoComplete=''
@@ -567,6 +567,10 @@ const EditChannel = () => {
                   config.api_version="v1beta"
                   handleInputChange(null, config);
                 }}>v1beta</Button>
+                <Button type={'button'} onClick={() => {
+                  config.api_version="v1alpha"
+                  handleInputChange(null, config);
+                }}>v1alpha</Button>
               </div>
             )
           }
