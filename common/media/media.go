@@ -72,7 +72,7 @@ func IsMediaUrl(url string) (bool, error) {
 		//先改为正常请求, 再次报错再进行异常抛出
 		resp, err = client.HTTPClient.Get(url)
 		if err != nil {
-			logger.SysLogf("IsMediaUrl - faild again:  %s", err)
+			logger.SysLogf("IsMediaUrl - failed again:  %s", err)
 			setMediaCache(url, false, "", "")
 			return false, fmt.Errorf("failed to get this url : %s, err: %s", url, err)
 		}
@@ -141,8 +141,22 @@ func SaveMediaByUrl(url string) (error, string, string) {
 	}
 
 	// 创建临时文件
+	// 判断文件夹是否存在
+	dirPath := "/mnt/tpm_file"
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		// 文件夹不存在，创建新的文件夹
+		err := os.MkdirAll(dirPath, 0755) // 0755 是文件夹的权限设置
+		if err != nil {
+			logger.SysLogf("SaveMediaByUrl - Error: MkdirAll temporary file: %s =>create dic failed: %s", url, err)
+			return err, "", ""
+		}
+	} else if err != nil {
+		// 其他错误
+		logger.SysLogf("SaveMediaByUrl - Error: MkdirAll temporary file: %s =>create dic error failed : %s", url, err)
+		return err, "", ""
+	}
 	tmp_name := fmt.Sprintf("tmpfile_%s%s", random.GetRandomNumberString(16), extension)
-	tempFile, err := os.CreateTemp("", tmp_name)
+	tempFile, err := os.CreateTemp(dirPath, tmp_name)
 	if err != nil {
 		logger.SysLogf("SaveMediaByUrl - Error: creating temporary file: %s => %s", url, tmp_name)
 		return err, "", ""
