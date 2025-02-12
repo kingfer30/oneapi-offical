@@ -467,7 +467,6 @@ func Handler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relaymodel.
 		return openai.ErrorWrapper(err, "unmarshal_response_body_failed", http.StatusInternalServerError), nil
 	}
 	if len(geminiResponse.Candidates) == 0 {
-		logger.SysErrorf("body: %s", string(responseBody))
 		return &relaymodel.ErrorWithStatusCode{
 			Error: relaymodel.Error{
 				Message: "No candidates returned. Check your parameter of max_tokens",
