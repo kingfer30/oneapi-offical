@@ -60,8 +60,8 @@ func main() {
 	}
 
 	// Initialize options
-	go model.InitOptionMap()
-	go model.InitGroupInfo()
+	model.InitOptionMap()
+	model.InitGroupInfo()
 	logger.SysLog(fmt.Sprintf("using theme %s", config.Theme))
 	if common.RedisEnabled {
 		// for compatibility with old versions

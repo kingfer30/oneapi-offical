@@ -552,10 +552,15 @@ func FileHandler(c *gin.Context, url string) (error, string, string) {
 		return fmt.Errorf("get old file error: %s", err.Error()), "", ""
 	}
 	if fileOld.FileId != "" {
-		meta.APIKey = fileOld.Key
-		c.Set("x-new-api-key", fileOld.Key)
-		c.Set("FileUri", fileOld.FileId)
-		return nil, fileOld.ContentType, fileOld.FileId
+		//如果已存在当前句柄的x-new-api-key变量, 说明同个请求多个文件,例如A文件对应账号T1, 此时查询存在B文件但是对应key与A文件不同, 则需要重新上传
+		//如果不存在缓存key或者 不同文件的key相同, 则可以用旧的值, 否则都需要重新上传
+		newKey := c.GetString("x-new-api-key")
+		if newKey == "" || newKey == fileOld.Key {
+			meta.APIKey = fileOld.Key
+			c.Set("x-new-api-key", fileOld.Key)
+			c.Set("FileUri", fileOld.FileId)
+			return nil, fileOld.ContentType, fileOld.FileId
+		}
 	}
 
 	//1. 保存文件
