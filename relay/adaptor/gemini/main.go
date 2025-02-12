@@ -551,6 +551,10 @@ func FileHandler(c *gin.Context, url string) (error, string, string) {
 	if err != nil {
 		return fmt.Errorf("get old file error: %s", err.Error()), "", ""
 	}
+	currentKey := c.GetString("x-new-api-key")
+	if currentKey == "" {
+		currentKey = meta.APIKey
+	}
 	if fileOld.FileId != "" {
 		//如果已存在当前句柄的x-new-api-key变量, 说明同个请求多个文件,例如A文件对应账号T1, 此时查询存在B文件但是对应key与A文件不同, 则需要重新上传
 		//如果不存在缓存key或者 不同文件的key相同, 则可以用旧的值, 否则都需要重新上传
@@ -574,7 +578,7 @@ func FileHandler(c *gin.Context, url string) (error, string, string) {
 		return err, "", ""
 	}
 	//3.初始化gemini客户端
-	client, err := genai.NewClient(c, option.WithAPIKey(meta.APIKey))
+	client, err := genai.NewClient(c, option.WithAPIKey(currentKey))
 	if err != nil {
 		return fmt.Errorf("init genai error: %s", err.Error()), "", ""
 	}
@@ -615,7 +619,7 @@ func FileHandler(c *gin.Context, url string) (error, string, string) {
 	//6. 保存文件数据
 	fileModel := model.Files{
 		TokenId:     meta.TokenId,
-		Key:         meta.APIKey,
+		Key:         currentKey,
 		ContentType: contentType,
 		ChannelId:   meta.ChannelId,
 		Url:         url,
@@ -625,7 +629,7 @@ func FileHandler(c *gin.Context, url string) (error, string, string) {
 	if err != nil {
 		return fmt.Errorf("Error: saving file failed: %s", err.Error()), "", ""
 	}
-	logger.SysLogf("[Upload File] API Key: %s | Url: %s | FileId: %d", meta.APIKey, file.URI, fileId)
+	logger.SysLogf("[Upload File] API Key: %s | Url: %s | FileId: %d", currentKey, file.URI, fileId)
 	c.Set("FileUri", file.URI)
 
 	return nil, contentType, file.URI
