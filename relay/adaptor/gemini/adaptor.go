@@ -157,6 +157,8 @@ func doRequest(c *gin.Context, req *http.Request) (*http.Response, error) {
 				Proxy: http.ProxyURL(url),
 			},
 		}
+		req.Header.Set("Connection", "close")
+		req.Header.Set("Proxy-Connection", "close")
 	}
 	resp, err := client.Do(req)
 	if err != nil {
