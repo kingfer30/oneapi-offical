@@ -9,7 +9,7 @@ import (
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
-	"log"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -65,7 +65,6 @@ func IsImageUrl(url string) (bool, error) {
 	result, err := common.RedisHashGet("image_url", random.StrToMd5(url))
 	if err == nil {
 		err = json.Unmarshal([]byte(result), &cache)
-		log.Printf("err: %v, %s, %s", err, random.StrToMd5(url), result)
 		if err == nil {
 			return cache.IsURL, nil
 		}
@@ -183,19 +182,20 @@ func GetImageFromUrl(url string) (mimeType string, data string, err error) {
 	}
 	resp, err := client.UserContentRequestHTTPClient.Get(url)
 	if err != nil {
-		resp, err = client.HTTPClient.Head(url)
-		if err != nil {
-			return "", "", fmt.Errorf("failed to get this url : %s, status : %s, err: %s", url, resp.Status, err)
-		}
+		return "", "", fmt.Errorf("failed to get this url : %s, err: %s", url, err)
 	}
 	defer resp.Body.Close()
-	buffer := bytes.NewBuffer(nil)
-	_, err = buffer.ReadFrom(resp.Body)
+	var encodedBuilder strings.Builder
+	encoder := base64.NewEncoder(base64.StdEncoding, &encodedBuilder)
+	defer encoder.Close()
+
+	_, err = io.Copy(encoder, resp.Body) // 流式处理
 	if err != nil {
-		return "", "", fmt.Errorf("failed to readFrom this url : %s, status : %s, err: %s", url, resp.Status, err)
+		return "", "", fmt.Errorf("copy error: %v", err)
 	}
+	data = encodedBuilder.String()
+
 	mimeType = resp.Header.Get("Content-Type")
-	data = base64.StdEncoding.EncodeToString(buffer.Bytes())
 	return mimeType, data, nil
 }
 
