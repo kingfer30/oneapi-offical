@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -185,13 +186,31 @@ func GetImageFromUrl(url string) (mimeType string, data string, err error) {
 		return "", "", fmt.Errorf("failed to get this url : %s, err: %s", url, err)
 	}
 	defer resp.Body.Close()
+
 	var encodedBuilder strings.Builder
 	encoder := base64.NewEncoder(base64.StdEncoding, &encodedBuilder)
 	defer encoder.Close()
 
-	_, err = io.Copy(encoder, resp.Body) // 流式处理
+	// 设置内存安全限制（示例设为10MB）
+	const maxSize = 10 << 20 // 10MB
+	limitedReader := io.LimitReader(resp.Body, maxSize)
+
+	bytesCopied, err := io.Copy(encoder, limitedReader) // 流式处理
 	if err != nil {
 		return "", "", fmt.Errorf("copy error: %v", err)
+	}
+	// 检查是否超过大小限制
+	if bytesCopied >= maxSize {
+		var m runtime.MemStats
+		runtime.ReadMemStats(&m)
+		logger.SysLogf("Memory usage: HeapInuse=%v MiB", m.HeapInuse/1024/1024)
+		logger.SysLogf("images is too large: %s,", url)
+		return "", "", fmt.Errorf("image exceeds maximum allowed size")
+	}
+
+	// 确保所有数据刷新到builder
+	if err := encoder.Close(); err != nil {
+		return "", "", fmt.Errorf("base64 close error: %w", err)
 	}
 	data = encodedBuilder.String()
 
