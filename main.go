@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 
@@ -20,6 +21,8 @@ import (
 	"github.com/songquanpeng/one-api/monitor"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/router"
+
+	_ "net/http/pprof"
 )
 
 //go:embed web/build/*
@@ -62,6 +65,7 @@ func main() {
 	// Initialize options
 	model.InitOptionMap()
 	model.InitGroupInfo()
+	// model.InitModelsInfo()
 	logger.SysLog(fmt.Sprintf("using theme %s", config.Theme))
 	if common.RedisEnabled {
 		// for compatibility with old versions
@@ -119,5 +123,14 @@ func main() {
 	err = server.Run(":" + port)
 	if err != nil {
 		logger.FatalLog("failed to start HTTP server: " + err.Error())
+	}
+	if os.Getenv("PPROF_DEBUG") == "true" {
+		pprofAddr := "0.0.0.0:6060"
+		go func(addr string) {
+			if err := http.ListenAndServe(addr, nil); err != http.ErrServerClosed {
+				logger.FatalLog("Pprof server ListenAndServe: " + err.Error())
+			}
+		}(pprofAddr)
+		logger.SysLog(fmt.Sprintf("HTTP Pprof start at : %s", pprofAddr))
 	}
 }

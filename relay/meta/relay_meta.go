@@ -7,6 +7,7 @@ import (
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay/channeltype"
+	relaymodel "github.com/songquanpeng/one-api/relay/model"
 	"github.com/songquanpeng/one-api/relay/relaymode"
 )
 
@@ -34,6 +35,8 @@ type Meta struct {
 	SystemPrompt    string
 	Thinking        bool
 	EndThinking     bool
+	SelfImplement   bool
+	TextRequest     *relaymodel.GeneralOpenAIRequest
 }
 
 func GetByContext(c *gin.Context) *Meta {
@@ -51,6 +54,7 @@ func GetByContext(c *gin.Context) *Meta {
 		APIKey:          strings.TrimPrefix(c.Request.Header.Get("Authorization"), "Bearer "),
 		RequestURLPath:  c.Request.URL.String(),
 		SystemPrompt:    c.GetString(ctxkey.SystemPrompt),
+		SelfImplement:   false,
 	}
 	cfg, ok := c.Get(ctxkey.Config)
 	if ok {

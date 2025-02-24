@@ -179,12 +179,11 @@ func SaveMediaByUrl(url string) (error, string, string) {
 			if n == 0 || err == io.EOF {
 				// 如果是EOF，说明已经读取完毕，可以正常退出循环
 				if n > 0 {
-					res, err := writer.Write(buf[:n])
+					_, err := writer.Write(buf[:n])
 					if err != nil {
 						logger.SysLogf("SaveMediaByUrl - Error: writer.Write file: %s => %s", url, err.Error())
 						return err, "", ""
 					}
-					logger.SysLogf("done - %v - %v - %v", n, res, total)
 				}
 				break
 			}

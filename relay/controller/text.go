@@ -20,6 +20,7 @@ import (
 	"github.com/songquanpeng/one-api/relay/channeltype"
 	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
+	"github.com/songquanpeng/one-api/relay/relaymode"
 )
 
 func RelayTextHelper(c *gin.Context) *model.ErrorWithStatusCode {
@@ -64,21 +65,27 @@ func RelayTextHelper(c *gin.Context) *model.ErrorWithStatusCode {
 	}
 	adaptor.Init(meta)
 
-	// get request body
-	requestBody, err := getRequestBody(c, meta, textRequest, adaptor)
-	if err != nil {
-		return openai.ErrorWrapper(err, "convert_request_failed", http.StatusInternalServerError)
-	}
+	// no need to convert request for self-implement
+	var resp *http.Response
+	if !meta.SelfImplement && meta.Mode != relaymode.Embeddings {
+		// get request body
+		requestBody, err := getRequestBody(c, meta, textRequest, adaptor)
+		if err != nil {
+			return openai.ErrorWrapper(err, "convert_request_failed", http.StatusInternalServerError)
+		}
 
-	// do request
-	resp, err := adaptor.DoRequest(c, meta, requestBody)
-	if err != nil {
-		logger.Errorf(ctx, "DoRequest failed: %s", err.Error())
-		return openai.ErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
-	}
-	if isErrorHappened(meta, resp) {
-		billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, meta.TokenId)
-		return RelayErrorHandler(resp)
+		// do request
+		resp, err = adaptor.DoRequest(c, meta, requestBody)
+		if err != nil {
+			logger.Errorf(ctx, "DoRequest failed: %s", err.Error())
+			return openai.ErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
+		}
+		if isErrorHappened(meta, resp) {
+			billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, meta.TokenId)
+			return RelayErrorHandler(resp)
+		}
+	} else {
+		meta.TextRequest = textRequest
 	}
 
 	// do response
