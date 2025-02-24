@@ -3,7 +3,6 @@ package main
 import (
 	"embed"
 	"fmt"
-	"net/http"
 	"os"
 	"strconv"
 
@@ -22,6 +21,7 @@ import (
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/router"
 
+	"net/http"
 	_ "net/http/pprof"
 )
 
@@ -103,6 +103,15 @@ func main() {
 	openai.InitTokenEncoders()
 	client.Init()
 
+	if os.Getenv("PPROF_DEBUG") == "true" {
+		pprofAddr := "0.0.0.0:6060"
+		go func(addr string) {
+			if err := http.ListenAndServe(addr, nil); err != http.ErrServerClosed {
+				logger.FatalLog("Pprof server ListenAndServe: " + err.Error())
+			}
+		}(pprofAddr)
+		logger.SysLog(fmt.Sprintf("HTTP Pprof start at : %s", pprofAddr))
+	}
 	// Initialize HTTP server
 	server := gin.New()
 	server.Use(gin.Recovery())
@@ -123,14 +132,5 @@ func main() {
 	err = server.Run(":" + port)
 	if err != nil {
 		logger.FatalLog("failed to start HTTP server: " + err.Error())
-	}
-	if os.Getenv("PPROF_DEBUG") == "true" {
-		pprofAddr := "0.0.0.0:6060"
-		go func(addr string) {
-			if err := http.ListenAndServe(addr, nil); err != http.ErrServerClosed {
-				logger.FatalLog("Pprof server ListenAndServe: " + err.Error())
-			}
-		}(pprofAddr)
-		logger.SysLog(fmt.Sprintf("HTTP Pprof start at : %s", pprofAddr))
 	}
 }
