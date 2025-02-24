@@ -191,8 +191,8 @@ func GetImageFromUrl(url string) (mimeType string, data string, err error) {
 	encoder := base64.NewEncoder(base64.StdEncoding, &encodedBuilder)
 	defer encoder.Close()
 
-	// 设置内存安全限制（示例设为10MB）
-	const maxSize = 10 << 20 // 10MB
+	// 设置内存安全限制（示例设为20MB）
+	const maxSize = 20 << 20 // 20MB
 	limitedReader := io.LimitReader(resp.Body, maxSize)
 
 	bytesCopied, err := io.Copy(encoder, limitedReader) // 流式处理
