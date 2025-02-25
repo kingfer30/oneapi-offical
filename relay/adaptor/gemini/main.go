@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/googleapis/gax-go/v2/apierror"
 	"github.com/songquanpeng/one-api/common/media"
 	"github.com/songquanpeng/one-api/common/render"
 	"github.com/songquanpeng/one-api/model"
@@ -603,7 +604,7 @@ func FileHandler(c *gin.Context, url string) (string, string, error) {
 		return "", "", fmt.Errorf("upload file error: %s", err.Error())
 	}
 	defer f.Close()
-	defer os.Remove(fileName) // 确保在程序结束时删除临时文件
+	// defer os.Remove(fileName) // 确保在程序结束时删除临时文件
 
 	//5. 循环获取文件上传状态
 	retryNum := 10
@@ -642,24 +643,30 @@ func FileHandler(c *gin.Context, url string) (string, string, error) {
 
 func DoChatByGenai(c *gin.Context, meta *meta.Meta) (*relaymodel.Usage, string, *relaymodel.ErrorWithStatusCode) {
 	textRequest := meta.TextRequest
-	//初始化gemini客户端
+	// //初始化gemini客户端
 	// var httpClient *http.Client
 	// if config.HttpProxy == "" {
 	// 	httpClient = commonClient.HTTPClient
 	// } else {
 	// 	logger.SysLogf("使用代理: %s", config.HttpProxy)
-	// 	url, err := url.Parse(config.HttpProxy)
+	// 	urlObj, err := url.Parse("http://199.119.138.75:1080")
+	// 	urlObj.User = url.UserPassword("xiaoguo", "Ji6dft4Cqd9l_eX6h3")
+	// 	logger.SysLogf("%v", urlObj)
 	// 	if err != nil {
 	// 		return nil, "", openai.ErrorWrapper(err, "http_proxy_url.parse_failed", http.StatusInternalServerError)
 	// 	}
 	// 	httpClient = &http.Client{
 	// 		Transport: &http.Transport{
-	// 			Proxy: http.ProxyURL(url),
+	// 			Proxy:           http.ProxyURL(urlObj),
+	// 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // CAUTION: Insecure!
 	// 		},
 	// 	}
 	// }
-	// client, err := genai.NewClient(c, option.WithAPIKey(meta.APIKey), option.WithHTTPClient(httpClient))
 	client, err := genai.NewClient(c, option.WithAPIKey(meta.APIKey))
+	// client, err := genai.NewClient(c, option.WithAPIKey(meta.APIKey), option.WithHTTPClient(httpClient))
+	// client2, err := gemini.NewClient(c, &gemini.ClientConfig{
+	// 	APIKey: meta.APIKey,
+	// })
 	if err != nil {
 		return nil, "", openai.ErrorWrapper(err, "init_genai_error", http.StatusInternalServerError)
 	}
@@ -766,7 +773,28 @@ func DoChatByGenai(c *gin.Context, meta *meta.Meta) (*relaymodel.Usage, string, 
 			resp, err := model.GenerateContent(c, parts...)
 			if err != nil {
 				// 处理错误
-				return nil, "", openai.ErrorWrapper(err, "generate_content_error", http.StatusInternalServerError)
+				var gerr *googleapi.Error
+				apiError, ok := err.(*apierror.APIError)
+				if !errors.As(err, &gerr) {
+					logger.SysErrorf("faild to as googleapi error: %s\n", err.Error())
+					return nil, "", openai.ErrorWrapper(err, "generate_content_error", http.StatusInternalServerError)
+				} else {
+					if ok {
+						statusCode := apiError.HTTPCode()               // 获取 HTTP 状态码
+						errorMessage := apiError.GRPCStatus().Message() // 获取 错误消息 (更通用的描述)
+						status := apiError.GRPCStatus()                 // 获取 gRPC 状态码和消息 (如果适用)
+						details := apiError.Details()                   // 获取 错误详情 (可能包含更结构化的信息)
+						fmt.Printf("API 调用失败:\n")
+						fmt.Printf("HTTP 状态码: %d\n", statusCode)
+						fmt.Printf("错误消息: %s\n", errorMessage)
+						if status != nil {
+							fmt.Printf("gRPC 状态码: %v\n", status.Code())
+							fmt.Printf("gRPC 错误消息: %s\n", status.Message())
+						}
+						fmt.Printf("details: %v\n", details)
+					}
+					return nil, "", openai.ErrorWrapper(err, "generate_content_error", http.StatusInternalServerError)
+				}
 			}
 			jerr, fullText, usage = handleGenaiUnStream(c, meta, resp)
 			if jerr != nil {
@@ -843,7 +871,29 @@ func DoChatByGenai(c *gin.Context, meta *meta.Meta) (*relaymodel.Usage, string, 
 		resp, err := cs.SendMessage(c, last.Parts...)
 		if err != nil {
 			// 处理错误
-			return nil, "", openai.ErrorWrapper(err, "generate_content_error", http.StatusInternalServerError)
+			var gerr *googleapi.Error
+			apiError, ok := err.(*apierror.APIError)
+			if !errors.As(err, &gerr) {
+				logger.SysErrorf("faild to as googleapi error: %s\n", err.Error())
+				return nil, "", openai.ErrorWrapper(err, "generate_content_error", http.StatusInternalServerError)
+			} else {
+				if ok {
+					statusCode := apiError.HTTPCode()               // 获取 HTTP 状态码
+					errorMessage := apiError.GRPCStatus().Message() // 获取 错误消息 (更通用的描述)
+					status := apiError.GRPCStatus()                 // 获取 gRPC 状态码和消息 (如果适用)
+					details := apiError.Details()                   // 获取 错误详情 (可能包含更结构化的信息)
+					fmt.Printf("API 调用失败:\n")
+					fmt.Printf("HTTP 状态码: %d\n", statusCode)
+					fmt.Printf("错误消息: %s\n", errorMessage)
+					if status != nil {
+						fmt.Printf("gRPC 状态码: %v\n", status.Code())
+						fmt.Printf("gRPC 错误消息: %s\n", status.Message())
+					}
+					fmt.Printf("details: %v\n", details)
+				}
+
+				return nil, "", openai.ErrorWrapper(err, "generate_content_genai_error", http.StatusInternalServerError)
+			}
 		}
 		jerr, fullText, usage = handleGenaiUnStream(c, meta, resp)
 		if jerr != nil {
@@ -929,11 +979,27 @@ func handleGenaiStream(c *gin.Context, meta *meta.Meta, iter *genai.GenerateCont
 			break
 		}
 		if err != nil {
+			// 处理错误
 			var gerr *googleapi.Error
+			apiError, ok := err.(*apierror.APIError)
 			if !errors.As(err, &gerr) {
 				logger.SysErrorf("faild to as googleapi error: %s\n", err.Error())
-				return openai.ErrorWrapper(err, "response_stream_error", http.StatusInternalServerError), "", nil
+				return openai.ErrorWrapper(err, "response_stream_genai_error", http.StatusInternalServerError), "", nil
 			} else {
+				if ok {
+					statusCode := apiError.HTTPCode()               // 获取 HTTP 状态码
+					errorMessage := apiError.GRPCStatus().Message() // 获取 错误消息 (更通用的描述)
+					status := apiError.GRPCStatus()                 // 获取 gRPC 状态码和消息 (如果适用)
+					details := apiError.Details()                   // 获取 错误详情 (可能包含更结构化的信息)
+					fmt.Printf("API 调用失败:\n")
+					fmt.Printf("HTTP 状态码: %d\n", statusCode)
+					fmt.Printf("错误消息: %s\n", errorMessage)
+					if status != nil {
+						fmt.Printf("gRPC 状态码: %v\n", status.Code())
+						fmt.Printf("gRPC 错误消息: %s\n", status.Message())
+					}
+					fmt.Printf("details: %v\n", details)
+				}
 				return openai.ErrorWrapper(err, "response_stream_genai_error", http.StatusInternalServerError), "", nil
 			}
 		}
