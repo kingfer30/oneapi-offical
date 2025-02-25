@@ -69,6 +69,7 @@ func testChannel(channel *model.Channel, request *relaymodel.GeneralOpenAIReques
 		return fmt.Errorf("invalid api type: %d, adaptor is nil", apiType), nil
 	}
 	adaptor.Init(meta)
+	meta.SelfImplement = false
 	modelName := request.Model
 	modelMap := channel.GetModelMapping()
 	if modelName == "" || !strings.Contains(channel.Models, modelName) {

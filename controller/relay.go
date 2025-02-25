@@ -72,12 +72,11 @@ func Relay(c *gin.Context) {
 			logger.Errorf(ctx, "CacheGetRandomSatisfiedChannel failed: %+v", err)
 			break
 		}
-		logger.Infof(ctx, "using channel #%d to retry (remain times %d)", channel.Id, i)
 		if channel.Id == lastFailedChannelId {
 			continue
 		}
 		middleware.SetupContextForSelectedChannel(c, channel, originalModel)
-		requestBody, err := common.GetRequestBody(c)
+		requestBody, _ := common.GetRequestBody(c)
 		c.Request.Body = io.NopCloser(bytes.NewBuffer(requestBody))
 		bizErr = relayHelper(c, relayMode)
 		if bizErr == nil {
