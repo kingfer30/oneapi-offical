@@ -3,6 +3,8 @@ package model
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
@@ -286,4 +288,90 @@ func ActivateChannel(limit int64) bool {
 		}
 	}
 	return true
+}
+
+func UpdateChannelsAbilities() (any, error) {
+	result := []map[string]interface{}{}
+	var err error = nil
+	d := DB.Exec("SET SESSION group_concat_max_len=102400")
+	if d.Error != nil {
+		return false, d.Error
+	}
+	err = DB.Raw("select `group`, models, group_concat(id,'_',priority) as ids from `channels`  where `status` = ? group by `group`, models", ChannelStatusEnabled).Find(&result).Error
+	if err != nil {
+		return false, err
+	}
+
+	var abilities = []Ability{}
+	for _, data := range result {
+		groups := strings.Split(data["group"].(string), ",")
+		models := strings.Split(data["models"].(string), ",")
+		ids := strings.Split(data["ids"].(string), ",")
+		if len(groups) > 0 {
+			for _, group := range groups {
+				if len(models) > 0 {
+					for _, model := range models {
+						if len(ids) > 0 {
+							for _, idStr := range ids {
+								var channel_id int
+								var priority int64
+								parts := strings.Split(idStr, "_")
+								if len(parts) == 0 {
+									continue
+								}
+								if len(parts) == 1 {
+									channel_id, _ = strconv.Atoi(parts[0])
+									priority = 0
+								} else {
+									channel_id, _ = strconv.Atoi(parts[0])
+									priority, _ = strconv.ParseInt(parts[1], 10, 64)
+								}
+								abilities = append(abilities, Ability{
+									Group:     group,
+									Model:     model,
+									Enabled:   true,
+									ChannelId: channel_id,
+									Priority:  &priority,
+								})
+
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	if len(abilities) > 0 {
+		//清空表数据
+		// 开始事务
+		tx := DB.Begin()
+		if tx.Error != nil {
+			return false, tx.Error
+		}
+		d := DB.Exec("TRUNCATE TABLE abilities")
+		if d.Error != nil {
+			return false, d.Error
+		}
+		//重新插入
+		batchSize := 5000
+		var ind = 1
+		for i := 0; i < len(abilities); i += batchSize {
+			end := i + batchSize
+			if end > len(abilities) {
+				end = len(abilities)
+			}
+			batch := abilities[i:end]
+			// 插入数据
+			if err := tx.Create(batch).Error; err != nil {
+				tx.Rollback()
+				return false, err
+			}
+			ind++
+		}
+		// 提交事务
+		tx.Commit()
+		//更新缓存
+		InitChannelCache()
+	}
+	return true, nil
 }

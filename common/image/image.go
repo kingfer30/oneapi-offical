@@ -28,6 +28,16 @@ import (
 
 var CacheSecond int64 = 600
 
+var imageClient *http.Client
+
+func init() {
+	customTransport := http.DefaultTransport.(*http.Transport).Clone()
+	customTransport.Proxy = nil
+	imageClient = &http.Client{
+		Transport: customTransport,
+	}
+}
+
 type ImageCache struct {
 	IsURL       bool   `json:"is_url"`
 	ContentType string `json:"content_type"`
@@ -73,7 +83,7 @@ func IsImageUrl(url string) (bool, error) {
 	resp, err := client.UserContentRequestHTTPClient.Get(url)
 	if err != nil {
 		//先改为正常请求, 再次报错再进行异常抛出
-		resp, err = client.HTTPClient.Get(url)
+		resp, err = imageClient.Get(url)
 		if err != nil {
 			logger.SysLog(fmt.Sprintf("HTTPClient报错: %s", err.Error()))
 			setImageCache(url, false, "", 0, 0)
@@ -104,7 +114,12 @@ func GetImageSizeFromUrl(url string) (width int, height int, err error) {
 	}
 	resp, err := client.UserContentRequestHTTPClient.Get(url)
 	if err != nil {
-		return
+		//先改为正常请求, 再次报错再进行异常抛出
+		resp, err = imageClient.Get(url)
+		if err != nil {
+			logger.SysLog(fmt.Sprintf("HTTPClient报错: %s", err.Error()))
+			return
+		}
 	}
 	defer resp.Body.Close()
 	img, _, err := image.DecodeConfig(resp.Body)

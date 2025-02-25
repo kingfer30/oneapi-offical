@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -663,10 +662,7 @@ func DoChatByGenai(c *gin.Context, meta *meta.Meta) (*relaymodel.Usage, string, 
 	// 	}
 	// }
 	client, err := genai.NewClient(c, option.WithAPIKey(meta.APIKey))
-	// client, err := genai.NewClient(c, option.WithAPIKey(meta.APIKey), option.WithHTTPClient(httpClient))
-	// client2, err := gemini.NewClient(c, &gemini.ClientConfig{
-	// 	APIKey: meta.APIKey,
-	// })
+
 	if err != nil {
 		return nil, "", openai.ErrorWrapper(err, "init_genai_error", http.StatusInternalServerError)
 	}
@@ -772,29 +768,7 @@ func DoChatByGenai(c *gin.Context, meta *meta.Meta) (*relaymodel.Usage, string, 
 		} else {
 			resp, err := model.GenerateContent(c, parts...)
 			if err != nil {
-				// 处理错误
-				var gerr *googleapi.Error
-				apiError, ok := err.(*apierror.APIError)
-				if !errors.As(err, &gerr) {
-					logger.SysErrorf("faild to as googleapi error: %s\n", err.Error())
-					return nil, "", openai.ErrorWrapper(err, "generate_content_error", http.StatusInternalServerError)
-				} else {
-					if ok {
-						statusCode := apiError.HTTPCode()               // 获取 HTTP 状态码
-						errorMessage := apiError.GRPCStatus().Message() // 获取 错误消息 (更通用的描述)
-						status := apiError.GRPCStatus()                 // 获取 gRPC 状态码和消息 (如果适用)
-						details := apiError.Details()                   // 获取 错误详情 (可能包含更结构化的信息)
-						fmt.Printf("API 调用失败:\n")
-						fmt.Printf("HTTP 状态码: %d\n", statusCode)
-						fmt.Printf("错误消息: %s\n", errorMessage)
-						if status != nil {
-							fmt.Printf("gRPC 状态码: %v\n", status.Code())
-							fmt.Printf("gRPC 错误消息: %s\n", status.Message())
-						}
-						fmt.Printf("details: %v\n", details)
-					}
-					return nil, "", openai.ErrorWrapper(err, "generate_content_error", http.StatusInternalServerError)
-				}
+				return nil, "", handleGenaiError(err, true, meta)
 			}
 			jerr, fullText, usage = handleGenaiUnStream(c, meta, resp)
 			if jerr != nil {
@@ -871,29 +845,7 @@ func DoChatByGenai(c *gin.Context, meta *meta.Meta) (*relaymodel.Usage, string, 
 		resp, err := cs.SendMessage(c, last.Parts...)
 		if err != nil {
 			// 处理错误
-			var gerr *googleapi.Error
-			apiError, ok := err.(*apierror.APIError)
-			if !errors.As(err, &gerr) {
-				logger.SysErrorf("faild to as googleapi error: %s\n", err.Error())
-				return nil, "", openai.ErrorWrapper(err, "generate_content_error", http.StatusInternalServerError)
-			} else {
-				if ok {
-					statusCode := apiError.HTTPCode()               // 获取 HTTP 状态码
-					errorMessage := apiError.GRPCStatus().Message() // 获取 错误消息 (更通用的描述)
-					status := apiError.GRPCStatus()                 // 获取 gRPC 状态码和消息 (如果适用)
-					details := apiError.Details()                   // 获取 错误详情 (可能包含更结构化的信息)
-					fmt.Printf("API 调用失败:\n")
-					fmt.Printf("HTTP 状态码: %d\n", statusCode)
-					fmt.Printf("错误消息: %s\n", errorMessage)
-					if status != nil {
-						fmt.Printf("gRPC 状态码: %v\n", status.Code())
-						fmt.Printf("gRPC 错误消息: %s\n", status.Message())
-					}
-					fmt.Printf("details: %v\n", details)
-				}
-
-				return nil, "", openai.ErrorWrapper(err, "generate_content_genai_error", http.StatusInternalServerError)
-			}
+			return nil, "", handleGenaiError(err, false, meta)
 		}
 		jerr, fullText, usage = handleGenaiUnStream(c, meta, resp)
 		if jerr != nil {
@@ -980,28 +932,7 @@ func handleGenaiStream(c *gin.Context, meta *meta.Meta, iter *genai.GenerateCont
 		}
 		if err != nil {
 			// 处理错误
-			var gerr *googleapi.Error
-			apiError, ok := err.(*apierror.APIError)
-			if !errors.As(err, &gerr) {
-				logger.SysErrorf("faild to as googleapi error: %s\n", err.Error())
-				return openai.ErrorWrapper(err, "response_stream_genai_error", http.StatusInternalServerError), "", nil
-			} else {
-				if ok {
-					statusCode := apiError.HTTPCode()               // 获取 HTTP 状态码
-					errorMessage := apiError.GRPCStatus().Message() // 获取 错误消息 (更通用的描述)
-					status := apiError.GRPCStatus()                 // 获取 gRPC 状态码和消息 (如果适用)
-					details := apiError.Details()                   // 获取 错误详情 (可能包含更结构化的信息)
-					fmt.Printf("API 调用失败:\n")
-					fmt.Printf("HTTP 状态码: %d\n", statusCode)
-					fmt.Printf("错误消息: %s\n", errorMessage)
-					if status != nil {
-						fmt.Printf("gRPC 状态码: %v\n", status.Code())
-						fmt.Printf("gRPC 错误消息: %s\n", status.Message())
-					}
-					fmt.Printf("details: %v\n", details)
-				}
-				return openai.ErrorWrapper(err, "response_stream_genai_error", http.StatusInternalServerError), "", nil
-			}
+			return handleGenaiError(err, false, meta), "", nil
 		}
 		var choice openai.ChatCompletionsStreamResponseChoice
 		var response openai.ChatCompletionsStreamResponse
@@ -1153,4 +1084,37 @@ func handleGenaiUnStream(c *gin.Context, meta *meta.Meta, resp *genai.GenerateCo
 	c.Writer.WriteHeader(http.StatusOK)
 	_, _ = c.Writer.Write(jsonResponse)
 	return nil, fullText, &usage
+}
+func handleGenaiError(err error, canAs bool, meta *meta.Meta) *relaymodel.ErrorWithStatusCode {
+	// 处理错误
+	apiError, ok := err.(*apierror.APIError)
+	if ok {
+		statusCode := apiError.HTTPCode()
+		errorMessage := apiError.GRPCStatus().Message()
+		if errorMessage == "" {
+			errorMessage = "unknow error in apierror"
+		}
+		if statusCode == http.StatusTooManyRequests {
+			errorMessage = "Resource has been exhausted (e.g. check quota)."
+			if !canAs {
+				//这里需要另起一个协程检查该渠道是否存在问题 是则禁用, 因为多文本使用stream, 无法识别错误(垃圾)
+			}
+		}
+		return openai.ErrorWrapper(fmt.Errorf("%s", errorMessage), "agg_genai_error", statusCode)
+	}
+	gerr, ok := err.(*googleapi.Error)
+	if ok {
+		statusCode := gerr.Code
+		errorMessage := gerr.Message
+		if errorMessage == "" {
+			errorMessage = "unknow error in googleapi"
+		}
+		if statusCode == http.StatusTooManyRequests {
+			errorMessage = "Resource has been exhausted (e.g. check quota)."
+		}
+		return openai.ErrorWrapper(fmt.Errorf("%s", errorMessage), "agg_genai_error", statusCode)
+	} else {
+		logger.SysErrorf("faild to as googleapi error: %s\n", err.Error())
+		return openai.ErrorWrapper(err, "agg_genai_error", http.StatusInternalServerError)
+	}
 }

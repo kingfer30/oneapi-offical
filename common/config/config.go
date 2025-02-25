@@ -21,8 +21,14 @@ var ChatLink = ""
 var QuotaPerUnit = 500 * 1000.0 // $0.002 / 1K tokens
 var DisplayInCurrencyEnabled = true
 var DisplayTokenStatEnabled = true
+var AutoAddChannelEnabled = false
+var CacheChannelEnabled = false
+var GeminiNewEnabled = false
 var HttpProxy = ""
 var QuotaForAddChannel = 0
+
+// random, polling, limit
+var PoolMode = ""
 
 // Any options with "Secret", "Token" in its key won't be return by GetOptions
 

@@ -1,13 +1,14 @@
 package controller
 
 import (
+	"net/http"
+	"strconv"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/model"
-	"net/http"
-	"strconv"
-	"strings"
 )
 
 func GetAllChannels(c *gin.Context) {
@@ -167,6 +168,22 @@ func UpdateChannel(c *gin.Context) {
 		"success": true,
 		"message": "",
 		"data":    channel,
+	})
+	return
+}
+func UpdateChannelsAbilities(c *gin.Context) {
+	data, err := model.UpdateChannelsAbilities()
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    data,
 	})
 	return
 }

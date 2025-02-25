@@ -40,6 +40,9 @@ func InitOptionMap() {
 	config.OptionMap["LogConsumeEnabled"] = strconv.FormatBool(config.LogConsumeEnabled)
 	config.OptionMap["DisplayInCurrencyEnabled"] = strconv.FormatBool(config.DisplayInCurrencyEnabled)
 	config.OptionMap["DisplayTokenStatEnabled"] = strconv.FormatBool(config.DisplayTokenStatEnabled)
+	config.OptionMap["CacheChannelEnabled"] = strconv.FormatBool(config.CacheChannelEnabled)
+	config.OptionMap["AutoAddChannelEnabled"] = strconv.FormatBool(config.AutoAddChannelEnabled)
+	config.OptionMap["GeminiNewEnabled"] = strconv.FormatBool(config.GeminiNewEnabled)
 	config.OptionMap["ChannelDisableThreshold"] = strconv.FormatFloat(config.ChannelDisableThreshold, 'f', -1, 64)
 	config.OptionMap["EmailDomainRestrictionEnabled"] = strconv.FormatBool(config.EmailDomainRestrictionEnabled)
 	config.OptionMap["EmailDomainWhitelist"] = strings.Join(config.EmailDomainWhitelist, ",")
@@ -77,6 +80,11 @@ func InitOptionMap() {
 	config.OptionMap["QuotaPerUnit"] = strconv.FormatFloat(config.QuotaPerUnit, 'f', -1, 64)
 	config.OptionMap["RetryTimes"] = strconv.Itoa(config.RetryTimes)
 	config.OptionMap["Theme"] = config.Theme
+	config.OptionMap["PoolMode"] = config.PoolMode
+	if config.OptionMap["PoolMode"] == "" {
+		config.OptionMap["PoolMode"] = "random"
+	}
+	config.OptionMap["QuotaForAddChannel"] = strconv.Itoa(config.QuotaForAddChannel)
 	config.OptionMapRWMutex.Unlock()
 	loadOptionsFromDatabase()
 }
@@ -157,6 +165,12 @@ func updateOptionMap(key string, value string) (err error) {
 			config.DisplayInCurrencyEnabled = boolValue
 		case "DisplayTokenStatEnabled":
 			config.DisplayTokenStatEnabled = boolValue
+		case "CacheChannelEnabled":
+			config.CacheChannelEnabled = boolValue
+		case "AutoAddChannelEnabled":
+			config.AutoAddChannelEnabled = boolValue
+		case "GeminiNewEnabled":
+			config.GeminiNewEnabled = boolValue
 		}
 	}
 	switch key {
@@ -247,6 +261,11 @@ func updateOptionMap(key string, value string) (err error) {
 		config.QuotaPerUnit, _ = strconv.ParseFloat(value, 64)
 	case "Theme":
 		config.Theme = value
+	case "PoolMode":
+		config.PoolMode = value
+		if config.PoolMode == "" {
+			config.PoolMode = "random"
+		}
 	}
 	return err
 }

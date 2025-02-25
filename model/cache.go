@@ -172,6 +172,14 @@ var group2model2channels map[string]map[string][]*Channel
 var channelSyncLock sync.RWMutex
 
 func InitChannelCache() {
+	//写入一把锁用于并发锁
+	if count, serr := common.RedisExists("CHANNEL_GENERATE_LOCK"); serr != nil || count == 0 {
+		if ok, err := common.RedisSetNx("CHANNEL_GENERATE_LOCK", "1", time.Duration(10*time.Second)); ok || err == nil {
+			InitChannelCacheByMem()
+		}
+	}
+}
+func InitChannelCacheByMem() {
 	newChannelId2channel := make(map[int]*Channel)
 	var channels []*Channel
 	DB.Where("status = ?", ChannelStatusEnabled).Find(&channels)

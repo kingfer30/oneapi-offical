@@ -26,7 +26,7 @@ type Adaptor struct {
 }
 
 func (a *Adaptor) Init(meta *meta.Meta) {
-	// meta.SelfImplement = true
+	meta.SelfImplement = config.GeminiNewEnabled
 }
 
 func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {

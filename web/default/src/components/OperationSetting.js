@@ -16,7 +16,6 @@ const OperationSetting = () => {
     TopUpLink: '',
     ChatLink: '',
     QuotaPerUnit: 0,
-    QuotaForAddChannel: 0,
     AutomaticDisableChannelEnabled: '',
     AutomaticEnableChannelEnabled: '',
     ChannelDisableThreshold: 0,
@@ -24,10 +23,16 @@ const OperationSetting = () => {
     DisplayInCurrencyEnabled: '',
     DisplayTokenStatEnabled: '',
     ApproximateTokenEnabled: '',
-    RetryTimes: 0
+    RetryTimes: 0,
+    PoolMode: 'random',
+    AutoAddChannelEnabled: '',
+    CacheChannelEnabled: '',
+    GeminiNewEnabled: '',
+    QuotaForAddChannel: 0,
   });
   const [originInputs, setOriginInputs] = useState({});
   let [loading, setLoading] = useState(false);
+  let [btnLoading, setBtnLoading] = useState(false);
   let [historyTimestamp, setHistoryTimestamp] = useState(timestamp2string(now.getTime() / 1000 - 30 * 24 * 3600)); // a month ago
 
   const getOptions = async () => {
@@ -72,6 +77,17 @@ const OperationSetting = () => {
     }
     setLoading(false);
   };
+  const updateChannelAbilities = async () => {
+    setBtnLoading(true);
+    const res = await API.post('/api/channel/update_abilities', {});
+    const { success, message } = res.data;
+    if (success) {
+      showSuccess("渠道模型已更新");
+    } else {
+      showError(message);
+    }
+    setBtnLoading(false);
+  };
 
   const handleInputChange = async (e, { name, value }) => {
     if (name.endsWith('Enabled')) {
@@ -89,9 +105,6 @@ const OperationSetting = () => {
         }
         if (originInputs['QuotaRemindThreshold'] !== inputs.QuotaRemindThreshold) {
           await updateOption('QuotaRemindThreshold', inputs.QuotaRemindThreshold);
-        }
-        if (originInputs['QuotaForAddChannel'] !== inputs.QuotaForAddChannel) {
-          await updateOption('QuotaForAddChannel', inputs.QuotaForAddChannel);
         }
         break;
       case 'ratio':
@@ -145,6 +158,14 @@ const OperationSetting = () => {
           await updateOption('RetryTimes', inputs.RetryTimes);
         }
         break;
+        case 'channel':
+          if (originInputs['QuotaForAddChannel'] !== inputs.QuotaForAddChannel) {
+            await updateOption('QuotaForAddChannel', inputs.QuotaForAddChannel);
+          }
+          if (originInputs['PoolMode'] !== inputs.PoolMode) {
+            await updateOption('PoolMode', inputs.PoolMode);
+          }
+          break;
     }
   };
 
@@ -158,6 +179,11 @@ const OperationSetting = () => {
     }
     showError('日志清理失败：' + message);
   };
+  
+  const poolOptions = [
+    { key: "random", text: '普通随机模式', value: 'random' },
+    { key: "polling", text: '最优轮询模式', value: 'polling' },
+  ]
 
   return (
     <Grid columns={1}>
@@ -231,6 +257,62 @@ const OperationSetting = () => {
             submitConfig('general').then();
           }}>保存通用设置</Form.Button>
           <Divider />
+          <Header as='h3'>
+              渠道设置
+            </Header>
+            <Form.Button onClick={() => {
+              updateChannelAbilities().then();
+            }} loading={btnLoading}>一键更新渠道模型</Form.Button>
+            <Form.Group inline>
+              <Form.Select
+                name='PoolMode'
+                label='命中模式'
+                options={poolOptions}
+                placeholder='选择命中模式'
+                value={inputs.PoolMode}
+                onChange={handleInputChange}
+              />
+            </Form.Group>
+            <Form.Group inline>
+              <Form.Checkbox
+                checked={inputs.CacheChannelEnabled === 'true'}
+                label='启用Redis缓存渠道信息'
+                name='CacheChannelEnabled'
+                onChange={handleInputChange}
+              /><i className="warning circle icon" style={{ display: 'flex', alignItems: 'center' }}></i>启用后渠道信息将使用Redis引擎进行缓存, 而不缓存在内存中, 可通过手动移除Redis的渠道缓存以及时更新信息
+            </Form.Group>
+            <Form.Group inline>
+              <Form.Checkbox
+                checked={inputs.AutoAddChannelEnabled === 'true'}
+                label='启用自动补货'
+                name='AutoAddChannelEnabled'
+                onChange={handleInputChange}
+              /><i className="warning circle icon" style={{ display: 'flex', alignItems: 'center' }}></i>根据设定渠道可用数量, 当渠道实际可用数量小于设定值时, 自动将备用池的渠道启动
+            </Form.Group>
+            <Form.Group inline>
+              <Form.Checkbox
+                checked={inputs.GeminiNewEnabled === 'true'}
+                label='Gemini启用新版逻辑'
+                name='GeminiNewEnabled'
+                onChange={handleInputChange}
+              /><i className="warning circle icon" style={{ display: 'flex', alignItems: 'center' }}></i>启用后Gemini类型将采用新版逻辑
+            </Form.Group>
+            <Form.Group inline>
+              <Form.Input
+                label='补货阈值'
+                name='QuotaForAddChannel'
+                onChange={handleInputChange}
+                autoComplete='new-password'
+                value={inputs.QuotaForAddChannel}
+                type='number'
+                min='0'
+                placeholder='低于此阈值时, 对应渠道类型自动将待激活的渠道激活'
+              />
+            </Form.Group>
+            <Form.Button onClick={() => {
+              submitConfig('channel').then();
+            }}>保存渠道设置</Form.Button>
+            <Divider />
           <Header as='h3'>
             日志设置
           </Header>
