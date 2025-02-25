@@ -2,6 +2,7 @@ package gemini
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -76,6 +77,10 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	default:
 		geminiRequest, err := ConvertRequest(c, *request)
 		if err != nil {
+			b, jerr := json.Marshal(geminiRequest)
+			if jerr == nil {
+				logger.SysErrorf("ConvertRequest error : %s\n, %s", err.Error(), string(b))
+			}
 			return nil, err
 		}
 		return geminiRequest, nil
