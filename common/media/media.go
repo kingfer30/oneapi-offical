@@ -55,8 +55,9 @@ func IsMediaUrl(url string) (bool, error) {
 		//url no check
 		return false, nil
 	}
+
 	mediaRegex := regexp.MustCompile(`(mp4|mov|mpeg|mpg|webm|wmv|3gpp|avi|x-flv|pdf|wav|mp3|aiff|aac|ogg|flac)$`)
-	if mediaRegex.MatchString(url) {
+	if mediaRegex.MatchString(strings.ToLower(url)) {
 		return true, nil
 	}
 	var cache *MediaCache
@@ -93,7 +94,7 @@ func SaveMediaByUrl(url string) (error, string, string) {
 	result, err := common.RedisHashGet("media_url", random.StrToMd5(url))
 	if err == nil {
 		err = json.Unmarshal([]byte(result), &cache)
-		if err == nil {
+		if err == nil && cache.Path != "" {
 			return nil, cache.ContentType, cache.Path
 		}
 	}
