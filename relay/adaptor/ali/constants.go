@@ -19,5 +19,5 @@ var ModelList = []string{
 	"qwen2.5-math-72b-instruct", "qwen2.5-math-7b-instruct", "qwen2.5-math-1.5b-instruct", "qwen2-math-72b-instruct", "qwen2-math-7b-instruct", "qwen2-math-1.5b-instruct",
 	"qwen2.5-coder-32b-instruct", "qwen2.5-coder-14b-instruct", "qwen2.5-coder-7b-instruct", "qwen2.5-coder-3b-instruct", "qwen2.5-coder-1.5b-instruct", "qwen2.5-coder-0.5b-instruct",
 	"text-embedding-v1", "text-embedding-v3", "text-embedding-v2", "text-embedding-async-v2", "text-embedding-async-v1",
-	"ali-stable-diffusion-xl", "ali-stable-diffusion-v1.5", "wanx-v1",
+	"ali-stable-diffusion-xl", "ali-stable-diffusion-v1.5", "wanx-v1", "qwen-max-2025-01-25",
 }

@@ -25,6 +25,10 @@ import (
 type Adaptor struct {
 }
 
+var (
+	userAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+)
+
 func (a *Adaptor) Init(meta *meta.Meta) {
 	meta.SelfImplement = config.GeminiNewEnabled
 }
@@ -60,6 +64,10 @@ func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Request, meta *me
 	} else {
 		req.Header.Set("x-goog-api-key", meta.APIKey)
 	}
+
+	req.Header.Set("Connection", "close")
+	req.Header.Set("Proxy-Connection", "close")
+	req.Header.Set("User-Agent", userAgent)
 	return nil
 }
 
@@ -133,8 +141,6 @@ func doRequest(c *gin.Context, req *http.Request) (*http.Response, error) {
 				Proxy: http.ProxyURL(url),
 			},
 		}
-		req.Header.Set("Connection", "close")
-		req.Header.Set("Proxy-Connection", "close")
 	}
 	resp, err := client.Do(req)
 	if err != nil {
