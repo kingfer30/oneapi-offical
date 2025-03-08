@@ -65,8 +65,7 @@ func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Request, meta *me
 		req.Header.Set("x-goog-api-key", meta.APIKey)
 	}
 
-	req.Header.Set("Connection", "close")
-	req.Header.Set("Proxy-Connection", "close")
+	req.Header.Set("Host", "generativelanguage.googleapis.com")
 	req.Header.Set("User-Agent", userAgent)
 	return nil
 }
