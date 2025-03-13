@@ -230,7 +230,8 @@ func GetImageFromUrl(url string) (mimeType string, data string, err error) {
 	data = encodedBuilder.String()
 
 	mimeType = resp.Header.Get("Content-Type")
-	return mimeType, data, nil
+	parts := strings.SplitN(mimeType, ";", 2)
+	return parts[0], data, nil
 }
 
 var (
