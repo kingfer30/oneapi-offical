@@ -30,6 +30,7 @@ func ShouldDisableChannel(err *model.Error, statusCode int) bool {
 	if strings.Contains(lowerMessage, "your access was terminated") ||
 		strings.Contains(lowerMessage, "violation of our policies") ||
 		strings.Contains(lowerMessage, "your credit balance is too low") ||
+		strings.Contains(lowerMessage, "you have reached your specified api usage limits") ||
 		strings.Contains(lowerMessage, "organization has been disabled") ||
 		strings.Contains(lowerMessage, "credit") ||
 		strings.Contains(lowerMessage, "balance") ||
