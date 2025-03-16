@@ -1,6 +1,7 @@
 package image
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
@@ -11,6 +12,7 @@ import (
 	_ "image/png"
 	"io"
 	"net/http"
+	"os"
 	"regexp"
 	"runtime"
 	"strings"
@@ -43,9 +45,10 @@ type ImageCache struct {
 	ContentType string `json:"content_type"`
 	Width       int    `json:"width"`
 	Height      int    `json:"height"`
+	Path        string `json:"path"`
 }
 
-func setImageCache(url string, isUrl bool, contentType string, width int, height int) {
+func setImageCache(url string, isUrl bool, contentType string, width int, height int, path string) {
 	var cache *ImageCache
 	result, err := common.RedisHashGet("image_url", random.StrToMd5(url))
 	if err == nil {
@@ -69,6 +72,9 @@ func setImageCache(url string, isUrl bool, contentType string, width int, height
 	if height != 0 && cache.Height != height {
 		cache.Height = height
 	}
+	if path != "" && cache.Path != path {
+		cache.Path = path
+	}
 	common.RedisHashSet("image_url", random.StrToMd5(url), cache, CacheSecond)
 }
 func IsImageUrl(url string) (bool, error) {
@@ -86,16 +92,15 @@ func IsImageUrl(url string) (bool, error) {
 		resp, err = imageClient.Get(url)
 		if err != nil {
 			logger.SysLog(fmt.Sprintf("HTTPClient报错: %s", err.Error()))
-			setImageCache(url, false, "", 0, 0)
 			return false, err
 		}
 	}
 	if !strings.HasPrefix(resp.Header.Get("Content-Type"), "image/") {
 		logger.SysLog(fmt.Sprintf("Content-Type错误: %s", resp.Header.Get("Content-Type")))
-		setImageCache(url, false, "", 0, 0)
+		setImageCache(url, false, "", 0, 0, "")
 		return false, nil
 	}
-	setImageCache(url, true, resp.Header.Get("Content-Type"), 0, 0)
+	setImageCache(url, true, resp.Header.Get("Content-Type"), 0, 0, "")
 	return true, nil
 }
 
@@ -126,15 +131,16 @@ func GetImageSizeFromUrl(url string) (width int, height int, err error) {
 	if err != nil {
 		return
 	}
-	setImageCache(url, true, "", img.Width, img.Height)
+	setImageCache(url, true, "", img.Width, img.Height, "")
 	return img.Width, img.Height, nil
 }
 
-func getImageFormat(input string) (string, string, error) {
+func getImageFormat(input string, saveLocal bool) (string, string, error) {
 	if strings.HasPrefix(input, "http") || strings.HasPrefix(input, "https") {
 		//url no check
 		return "", "", nil
 	}
+	source := input
 	if strings.HasPrefix(input, "data:image/png;base64,") {
 		input = strings.TrimPrefix(input, "data:image/png;base64,")
 	} else if strings.HasPrefix(input, "data:image/jpeg;base64,") {
@@ -152,8 +158,20 @@ func getImageFormat(input string) (string, string, error) {
 	}
 	input = strings.TrimSpace(input)
 
+	var cache *ImageCache
+	result, err := common.RedisHashGet("image_url", random.StrToMd5(input))
+	if err == nil {
+		err = json.Unmarshal([]byte(result), &cache)
+		if err == nil {
+			if saveLocal {
+				return cache.ContentType, cache.Path, nil
+			} else {
+				return cache.ContentType, input, nil
+			}
+		}
+	}
+
 	var imageData []byte
-	var err error
 	imageData, err = base64.StdEncoding.DecodeString(input)
 	if err != nil {
 		logger.SysLog(fmt.Sprintf("Vision-Base64方式-DecodeString报错: %s->%s", input, err.Error()))
@@ -168,36 +186,98 @@ func getImageFormat(input string) (string, string, error) {
 
 	contentType := http.DetectContentType(dataToCheck)
 
+	t := ""
 	switch contentType {
 	case "image/jpeg":
-		return "jpeg", input, nil
+		t = "jpeg"
 	case "image/png":
-		return "png", input, nil
+		t = "png"
 	case "image/webp":
-		return "webp", input, nil
+		t = "webp"
+	case "image/heic":
+		t = "heic"
+	case "image/heif":
+		t = "image/heif"
 	case "image/gif":
-		return "gif", input, nil
-	default:
+		t = "gif"
+	}
+	if t == "" {
 		return "", "", fmt.Errorf("unsupported image format: %s", contentType)
 	}
+	if saveLocal {
+		//保存到本地文件
+		file, err := saveWithStream(input, t)
+		if err != nil {
+			return "", "", fmt.Errorf("fail to saveWithStream: %s", err)
+		}
+		setImageCache(source, true, contentType, 0, 0, file)
+		return contentType, file, nil
+	}
+	return contentType, input, nil
 }
 
-func GetImageFromUrl(url string) (mimeType string, data string, err error) {
+// 流式保存函数（内存安全版）
+func saveWithStream(base64Data string, ext string) (string, error) {
+	// 1. 创建解码流（复用格式检测后的纯净Base64数据）
+	decoder := base64.NewDecoder(base64.StdEncoding, strings.NewReader(base64Data))
+
+	// 2. 创建目标目录
+	dirPath := "/mnt/tpm_file"
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		if err := os.MkdirAll(dirPath, 0755); err != nil {
+			logger.SysLogf("saveWithStream - Error: MkdirAll temporary file: %s =>create dic failed: %s", dirPath, err)
+			return "", fmt.Errorf("saveWithStream - Error: %v", err)
+		}
+	} else if err != nil {
+		// 其他错误
+		logger.SysLogf("saveWithStream - Error: MkdirAll temporary file: %s =>create dic error failed : %s", dirPath, err)
+		return "", err
+	}
+
+	// 3. 创建临时文件（避免写入过程中被读取）
+	tmp_name := fmt.Sprintf("tmpfile_%s.%s", random.GetRandomNumberString(16), ext)
+	tmpFile, err := os.CreateTemp(dirPath, tmp_name)
+	if err != nil {
+		logger.SysLogf("saveWithStream - Error: creating temporary file: %s => %s", tmp_name, err)
+		return "", fmt.Errorf("saveWithStream - Error: %v", err)
+	}
+	defer tmpFile.Close()
+
+	// 4. 使用带内存限制的流式拷贝
+	bufferedWriter := bufio.NewWriterSize(tmpFile, 32*1024) // 32KB缓冲区
+	if _, err := io.CopyN(bufferedWriter, decoder, 20*1024*1024); err != nil && err != io.EOF {
+		logger.SysLogf("saveWithStream - Error: io.CopyN: %s => %s", tmp_name, err)
+		return "", fmt.Errorf("流式拷贝失败: %v", err)
+	}
+	if err := bufferedWriter.Flush(); err != nil {
+		logger.SysLogf("saveWithStream - Error: bufferedWriter.Flush: %s => %s", tmp_name, err)
+		return "", fmt.Errorf("缓冲写入失败: %v", err)
+	}
+
+	// 5. 原子重命名确保完整性
+	if err := os.Rename(tmpFile.Name(), (dirPath + "/" + tmp_name)); err != nil {
+		logger.SysLogf("saveWithStream - Error: os.Rename: %s => %s", (dirPath + "/" + tmp_name), err)
+		return "", fmt.Errorf("文件重命名失败: %v", err)
+	}
+	return (dirPath + "/" + tmp_name), nil
+}
+
+func GetImageFromUrl(url string, saveLocal bool) (mimeType string, data string, err error) {
 	// Check if the URL is a base64
-	imgType, imgData, err := getImageFormat(url)
+	imgType, imgData, err := getImageFormat(url, saveLocal)
 
 	if err == nil && imgType != "" {
 		// URL is a data URL
-		mimeType = "image/" + imgType
 		data = imgData
-		return mimeType, data, nil
+		return imgType, data, nil
 	}
 	isImage, err := IsImageUrl(url)
-	if !isImage {
+	if !isImage && err == nil {
 		return "", "", fmt.Errorf("failed to get this url : it may not an image")
 	}
 	resp, err := client.UserContentRequestHTTPClient.Get(url)
 	if err != nil {
+		setImageCache(url, false, "", 0, 0, "")
 		return "", "", fmt.Errorf("failed to get this url : %s, err: %s", url, err)
 	}
 	defer resp.Body.Close()
@@ -231,6 +311,21 @@ func GetImageFromUrl(url string) (mimeType string, data string, err error) {
 
 	mimeType = resp.Header.Get("Content-Type")
 	parts := strings.SplitN(mimeType, ";", 2)
+
+	if saveLocal {
+		t := strings.SplitN(parts[0], ";", 2)
+		ext := ""
+		if len(t) < 2 {
+			logger.SysLogf("GetImageFromUrl - saveLocal: split Content-Type err: %s =>%s=>%v", mimeType, parts[0], t)
+			ext = "unknow"
+		}
+		//保存到本地文件
+		file, err := saveWithStream(data, ext)
+		if err != nil {
+			return "", "", fmt.Errorf("fail to saveWithStream: %s", err)
+		}
+		setImageCache(url, true, parts[0], 0, 0, file)
+	}
 	return parts[0], data, nil
 }
 

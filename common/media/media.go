@@ -224,6 +224,17 @@ func SaveMediaByUrl(url string) (error, string, string) {
 func CheckLegalUrl(apiType int, contentType string) (string, error) {
 	if apiType == apitype.Gemini {
 		switch contentType {
+		//图片
+		case "image/png":
+			return "png", nil
+		case "image/jpeg":
+			return "jpeg", nil
+		case "image/webp":
+			return "webp", nil
+		case "image/heic":
+			return "heic", nil
+		case "image/heif":
+			return "image/heif", nil
 		//pdf
 		case "application/pdf":
 			return "pdf", nil

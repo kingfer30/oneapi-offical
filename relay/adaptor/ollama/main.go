@@ -5,10 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/songquanpeng/one-api/common/render"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/songquanpeng/one-api/common/render"
 
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/random"
@@ -45,7 +46,7 @@ func ConvertRequest(request model.GeneralOpenAIRequest) *ChatRequest {
 			case model.ContentTypeText:
 				contentText = part.Text
 			case model.ContentTypeImageURL:
-				_, data, _ := image.GetImageFromUrl(part.ImageURL.Url)
+				_, data, _ := image.GetImageFromUrl(part.ImageURL.Url, false)
 				imageUrls = append(imageUrls, data)
 			}
 		}

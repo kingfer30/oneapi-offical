@@ -24,6 +24,7 @@ var DisplayTokenStatEnabled = true
 var AutoAddChannelEnabled = false
 var CacheChannelEnabled = false
 var GeminiNewEnabled = false
+var GeminiUploadImageEnabled = false
 var HttpProxy = ""
 var QuotaForAddChannel = 0
 

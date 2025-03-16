@@ -43,6 +43,7 @@ func InitOptionMap() {
 	config.OptionMap["CacheChannelEnabled"] = strconv.FormatBool(config.CacheChannelEnabled)
 	config.OptionMap["AutoAddChannelEnabled"] = strconv.FormatBool(config.AutoAddChannelEnabled)
 	config.OptionMap["GeminiNewEnabled"] = strconv.FormatBool(config.GeminiNewEnabled)
+	config.OptionMap["GeminiUploadImageEnabled"] = strconv.FormatBool(config.GeminiUploadImageEnabled)
 	config.OptionMap["ChannelDisableThreshold"] = strconv.FormatFloat(config.ChannelDisableThreshold, 'f', -1, 64)
 	config.OptionMap["EmailDomainRestrictionEnabled"] = strconv.FormatBool(config.EmailDomainRestrictionEnabled)
 	config.OptionMap["EmailDomainWhitelist"] = strings.Join(config.EmailDomainWhitelist, ",")
@@ -171,6 +172,8 @@ func updateOptionMap(key string, value string) (err error) {
 			config.AutoAddChannelEnabled = boolValue
 		case "GeminiNewEnabled":
 			config.GeminiNewEnabled = boolValue
+		case "GeminiUploadImageEnabled":
+			config.GeminiUploadImageEnabled = boolValue
 		}
 	}
 	switch key {

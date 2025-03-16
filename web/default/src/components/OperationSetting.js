@@ -28,6 +28,7 @@ const OperationSetting = () => {
     AutoAddChannelEnabled: '',
     CacheChannelEnabled: '',
     GeminiNewEnabled: '',
+    GeminiUploadImageEnabled: '',
     QuotaForAddChannel: 0,
   });
   const [originInputs, setOriginInputs] = useState({});
@@ -296,6 +297,14 @@ const OperationSetting = () => {
                 name='GeminiNewEnabled'
                 onChange={handleInputChange}
               /><i className="warning circle icon" style={{ display: 'flex', alignItems: 'center' }}></i>启用后Gemini类型将采用新版逻辑
+            </Form.Group>
+            <Form.Group inline>
+              <Form.Checkbox
+                checked={inputs.GeminiUploadImageEnabled === 'true'}
+                label='开启图片上传至Gemini'
+                name='GeminiUploadImageEnabled'
+                onChange={handleInputChange}
+              /><i className="warning circle icon" style={{ display: 'flex', alignItems: 'center' }}></i>启用后识图对应的图片都会上传到Gemini
             </Form.Group>
             <Form.Group inline>
               <Form.Input

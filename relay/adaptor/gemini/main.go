@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/googleapis/gax-go/v2/apierror"
+	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/media"
 	"github.com/songquanpeng/one-api/common/render"
 	"github.com/songquanpeng/one-api/model"
@@ -128,7 +129,7 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 					return nil, err
 				}
 				if ok {
-					mimeType, fileData, err = FileHandler(c, part.ImageURL.Url)
+					mimeType, fileData, err = FileHandler(c, part.ImageURL.Url, "", "")
 					if err != nil {
 						return nil, err
 					}
@@ -139,16 +140,34 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 						},
 					})
 				} else {
-					mimeType, fileData, err = image.GetImageFromUrl(part.ImageURL.Url)
-					if err != nil {
-						return nil, err
+					// 这里图片统一转为File, 因为base64经常报错
+					if config.GeminiUploadImageEnabled {
+						mimeType, fileName, err := image.GetImageFromUrl(part.ImageURL.Url, true)
+						if err != nil {
+							return nil, err
+						}
+						mimeType, fileData, err = FileHandler(c, random.StrToMd5(part.ImageURL.Url), mimeType, fileName)
+						if err != nil {
+							return nil, err
+						}
+						parts = append(parts, Part{
+							FileData: &FileData{
+								MimeType: mimeType,
+								Uri:      fileData,
+							},
+						})
+					} else {
+						mimeType, fileData, err = image.GetImageFromUrl(part.ImageURL.Url, false)
+						if err != nil {
+							return nil, err
+						}
+						parts = append(parts, Part{
+							InlineData: &InlineData{
+								MimeType: mimeType,
+								Data:     fileData,
+							},
+						})
 					}
-					parts = append(parts, Part{
-						InlineData: &InlineData{
-							MimeType: mimeType,
-							Data:     fileData,
-						},
-					})
 				}
 
 			}
@@ -519,7 +538,7 @@ func EmbeddingHandler(c *gin.Context, resp *http.Response) (*relaymodel.ErrorWit
 }
 
 // 文件上传处理
-func FileHandler(c *gin.Context, url string) (string, string, error) {
+func FileHandler(c *gin.Context, url string, contentType string, fileName string) (string, string, error) {
 	meta := meta.GetByContext(c)
 	//判断文件是否已经存在
 	fileOld, err := model.GetFile(url)
@@ -543,9 +562,11 @@ func FileHandler(c *gin.Context, url string) (string, string, error) {
 	}
 
 	//1. 保存文件
-	err, contentType, fileName := media.SaveMediaByUrl(url)
-	if err != nil {
-		return "", "", fmt.Errorf("upload file error: %w", err)
+	if contentType == "" && fileName == "" {
+		err, contentType, fileName = media.SaveMediaByUrl(url)
+		if err != nil {
+			return "", "", fmt.Errorf("upload file error: %w", err)
+		}
 	}
 
 	//2. 检查文件是否支持的类型
@@ -855,7 +876,7 @@ func generateParts(c *gin.Context, message relaymodel.Message) ([]genai.Part, er
 				return nil, err
 			}
 			if ok {
-				mimeType, fileData, err = FileHandler(c, part.ImageURL.Url)
+				mimeType, fileData, err = FileHandler(c, part.ImageURL.Url, "", "")
 				if err != nil {
 					return nil, err
 				}
@@ -865,7 +886,7 @@ func generateParts(c *gin.Context, message relaymodel.Message) ([]genai.Part, er
 				})
 			} else {
 				var reg = regexp.MustCompile(`data:image/([^;]+);base64,`)
-				mimeType, fileData, err = image.GetImageFromUrl(part.ImageURL.Url)
+				mimeType, fileData, err = image.GetImageFromUrl(part.ImageURL.Url, true)
 				if err != nil {
 					return nil, err
 				}
