@@ -31,6 +31,9 @@ var (
 
 func (a *Adaptor) Init(meta *meta.Meta) {
 	meta.SelfImplement = config.GeminiNewEnabled
+	if IsImageModel(meta.OriginModelName) {
+		meta.IsImageModel = true
+	}
 }
 
 func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
@@ -166,7 +169,8 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 		meta.Thinking = true
 	}
 	if !meta.SelfImplement {
-		if meta.IsStream {
+		//标记了流式 并且 非画图模型, 走流式输出
+		if meta.IsStream && !meta.IsImageModel {
 			var responseText string
 			err, responseText, usage = StreamHandler(c, resp, meta)
 			if err == nil {
@@ -181,9 +185,15 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 			case relaymode.ImagesEdit:
 				fallthrough
 			case relaymode.ImagesGenerations:
-				err, usage = ImageHandler(c, resp)
+				err, usage = ImageHandler(c, meta, resp)
 			default:
-				err, usage = Handler(c, resp, meta)
+				if meta.IsImageModel {
+					//如果是chat, 但请求的画图模型, 则走画图模型的渲染
+					meta.Image2Chat = true
+					err, usage = ImageHandler(c, meta, resp)
+				} else {
+					err, usage = Handler(c, resp, meta)
+				}
 			}
 		}
 	} else {

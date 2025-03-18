@@ -4,13 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/image"
-	"github.com/songquanpeng/one-api/common/logger"
+	"github.com/songquanpeng/one-api/common/random"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
+	"github.com/songquanpeng/one-api/relay/constant"
+	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
 	relaymodel "github.com/songquanpeng/one-api/relay/model"
 )
@@ -75,7 +78,7 @@ func ConvertImageRequest(request relaymodel.ImageRequest) (*ImageRequest, error)
 
 	return &imageRequest, nil
 }
-func ImageHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCode, *model.Usage) {
+func ImageHandler(c *gin.Context, meta *meta.Meta, resp *http.Response) (*model.ErrorWithStatusCode, *model.Usage) {
 	responseFormat := c.GetString("response_format")
 	var geminiResponse ChatResponse
 	responseBody, err := io.ReadAll(resp.Body)
@@ -86,17 +89,12 @@ func ImageHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCo
 	if err != nil {
 		return openai.ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), nil
 	}
-
-	logger.SysLogf("responseBody: %s", string(responseBody))
+	log.Print(string(responseBody))
 	err = json.Unmarshal(responseBody, &geminiResponse)
 	if err != nil {
 		return openai.ErrorWrapper(err, "unmarshal_response_body_failed", http.StatusInternalServerError), nil
 	}
 
-	err = json.Unmarshal(responseBody, &geminiResponse)
-	if err != nil {
-		return openai.ErrorWrapper(err, "unmarshal_response_body_failed", http.StatusInternalServerError), nil
-	}
 	if len(geminiResponse.Candidates) == 0 {
 		return &relaymodel.ErrorWithStatusCode{
 			Error: relaymodel.Error{
@@ -108,10 +106,7 @@ func ImageHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCo
 			StatusCode: 400,
 		}, nil
 	}
-	fullResponse, jerr := responseGemini2OpenAIImage(&geminiResponse, responseFormat)
-	if jerr != nil {
-		return jerr, nil
-	}
+
 	var usage relaymodel.Usage
 	if geminiResponse.UsageMetadata != nil {
 		usage = relaymodel.Usage{
@@ -120,17 +115,78 @@ func ImageHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCo
 			TotalTokens:      geminiResponse.UsageMetadata.TotalTokenCount,
 		}
 	}
-
-	fullResponse.Usage = usage
-	jsonResponse, err := json.Marshal(fullResponse)
-	if err != nil {
-		return openai.ErrorWrapper(err, "marshal_response_body_failed", http.StatusInternalServerError), nil
+	var jsonResponse []byte
+	if meta.Image2Chat {
+		//请求画图模型, 但以聊天接口访问的, 按聊天接口的格式返回
+		fullResponse, jerr := responseGemini2OpenAIChat(&geminiResponse, responseFormat)
+		if jerr != nil {
+			return jerr, nil
+		}
+		fullResponse.Usage = usage
+		jsonResponse, err = json.Marshal(fullResponse)
+		if err != nil {
+			return openai.ErrorWrapper(err, "marshal_response_body_failed", http.StatusInternalServerError), nil
+		}
+	} else {
+		//请求画图模型, 以画图接口访问的, 按画图接口的格式返回
+		fullResponse, jerr := responseGemini2OpenAIImage(&geminiResponse, responseFormat)
+		if jerr != nil {
+			return jerr, nil
+		}
+		fullResponse.Usage = usage
+		jsonResponse, err = json.Marshal(fullResponse)
+		if err != nil {
+			return openai.ErrorWrapper(err, "marshal_response_body_failed", http.StatusInternalServerError), nil
+		}
 	}
 
 	c.Writer.Header().Set("Content-Type", "application/json")
 	c.Writer.WriteHeader(resp.StatusCode)
 	_, _ = c.Writer.Write(jsonResponse)
 	return nil, &usage
+}
+
+func responseGemini2OpenAIChat(response *ChatResponse, respType string) (*openai.TextResponse, *relaymodel.ErrorWithStatusCode) {
+	fullTextResponse := openai.TextResponse{
+		Id:      fmt.Sprintf("chatcmpl-%s", random.GetUUID()),
+		Object:  "chat.completion",
+		Created: helper.GetTimestamp(),
+		Choices: make([]openai.TextResponseChoice, 0, len(response.Candidates)),
+	}
+	for i, candidate := range response.Candidates {
+		choice := openai.TextResponseChoice{
+			Index: i,
+			Message: relaymodel.Message{
+				Role:    "assistant",
+				Content: "",
+			},
+			FinishReason: constant.StopFinishReason,
+		}
+		if len(candidate.Content.Parts) > 0 {
+			text := ""
+			for _, item := range candidate.Content.Parts {
+				text = ""
+				if item.InlineData != nil {
+					if respType == "b64_json" {
+						text = fmt.Sprintf(`%s\n<img src="data:%s;base64,%s">`, text, item.InlineData.MimeType, item.InlineData.Data)
+					} else {
+						//undo url格式需要上传图床
+						text = fmt.Sprintf(`%s\n<img src="data:%s;base64,%s">`, text, item.InlineData.MimeType, item.InlineData.Data)
+						// text = fmt.Sprintf(`%s\n<img src="%s">`, text, item.InlineData.Data)
+					}
+				} else {
+					text = fmt.Sprintf("%s\n%s", text, item.Text)
+				}
+			}
+			choice.Message.Content = text
+		} else {
+			choice.Message.Content = ""
+			choice.FinishReason = candidate.FinishReason
+		}
+		fullTextResponse.Choices = append(fullTextResponse.Choices, choice)
+	}
+
+	return &fullTextResponse, nil
 }
 
 func responseGemini2OpenAIImage(response *ChatResponse, respType string) (*ImageResponse, *relaymodel.ErrorWithStatusCode) {
@@ -145,7 +201,7 @@ func responseGemini2OpenAIImage(response *ChatResponse, respType string) (*Image
 							B64Json: item.InlineData.Data,
 						})
 					} else {
-						//url格式需要上传图床
+						//undo url格式需要上传图床
 						imgList = append(imgList, ImageData{
 							Url: item.InlineData.Data,
 						})

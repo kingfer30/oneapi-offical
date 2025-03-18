@@ -313,11 +313,13 @@ func GetImageFromUrl(url string, saveLocal bool) (mimeType string, data string, 
 	parts := strings.SplitN(mimeType, ";", 2)
 
 	if saveLocal {
-		t := strings.SplitN(parts[0], ";", 2)
+		t := strings.SplitN(parts[0], "/", 2)
 		ext := ""
 		if len(t) < 2 {
 			logger.SysLogf("GetImageFromUrl - saveLocal: split Content-Type err: %s =>%s=>%v", mimeType, parts[0], t)
 			ext = "unknow"
+		} else {
+			ext = t[1]
 		}
 		//保存到本地文件
 		file, err := saveWithStream(data, ext)
@@ -325,6 +327,7 @@ func GetImageFromUrl(url string, saveLocal bool) (mimeType string, data string, 
 			return "", "", fmt.Errorf("fail to saveWithStream: %s", err)
 		}
 		setImageCache(url, true, parts[0], 0, 0, file)
+		return parts[0], file, nil
 	}
 	return parts[0], data, nil
 }

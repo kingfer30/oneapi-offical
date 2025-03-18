@@ -36,6 +36,8 @@ type Meta struct {
 	Thinking        bool
 	EndThinking     bool
 	SelfImplement   bool
+	IsImageModel    bool
+	Image2Chat      bool
 	TextRequest     *relaymodel.GeneralOpenAIRequest
 }
 

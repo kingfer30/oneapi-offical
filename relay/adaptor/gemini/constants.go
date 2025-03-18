@@ -1,5 +1,7 @@
 package gemini
 
+import "strings"
+
 // https://ai.google.dev/models/gemini
 
 var ModelList = []string{
@@ -32,4 +34,18 @@ var ModelList = []string{
 	"gemini-2.0-flash-lite-preview-02-05",
 	"gemini-2.0-pro-exp-02-05",
 	"gemini-2.0-flash-exp-image-generation",
+}
+
+//定义支持画图的模型
+var ImageModelList = []string{
+	"gemini-2.0-flash-exp-image-generation",
+}
+
+func IsImageModel(name string) bool {
+	for _, model := range ImageModelList {
+		if strings.Contains(name, model) {
+			return true
+		}
+	}
+	return false
 }

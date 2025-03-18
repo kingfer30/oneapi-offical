@@ -38,17 +38,18 @@ var mimeTypeMap = map[string]string{
 
 // Setting safety to the lowest possible values since Gemini is already powerless enough
 func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest) (*ChatRequest, error) {
+	generationConfig := ChatGenerationConfig{
+		Temperature:     textRequest.Temperature,
+		TopP:            textRequest.TopP,
+		MaxOutputTokens: textRequest.MaxTokens,
+		StopSequences:   textRequest.Stop,
+	}
+	if IsImageModel(textRequest.Model) {
+		generationConfig.ResponseModalities = []string{"text", "image"}
+	}
 	geminiRequest := ChatRequest{
-		Contents: make([]ChatContent, 0, len(textRequest.Messages)),
-		GenerationConfig: ChatGenerationConfig{
-			Temperature:     textRequest.Temperature,
-			TopP:            textRequest.TopP,
-			MaxOutputTokens: textRequest.MaxTokens,
-			StopSequences:   textRequest.Stop,
-			// ThinkingConfig: ThinkingConfig{
-			// 	IncludeThoughts: true,
-			// },
-		},
+		Contents:         make([]ChatContent, 0, len(textRequest.Messages)),
+		GenerationConfig: generationConfig,
 	}
 	if textRequest.Modalities != nil {
 		geminiRequest.GenerationConfig.ResponseModalities = textRequest.Modalities
@@ -323,7 +324,6 @@ func responseGeminiChat2OpenAI(response *ChatResponse, meta *meta.Meta) *openai.
 							}
 						}
 					}
-
 				}
 			}
 		} else {
