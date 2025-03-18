@@ -41,13 +41,14 @@ var ImageSizeRatios = map[string]map[string]float64{
 }
 
 var ImageGenerationAmounts = map[string][2]int{
-	"dall-e-2":                  {1, 10},
-	"dall-e-3":                  {1, 1}, // OpenAI allows n=1 currently.
-	"ali-stable-diffusion-xl":   {1, 4}, // Ali
-	"ali-stable-diffusion-v1.5": {1, 4}, // Ali
-	"wanx-v1":                   {1, 4}, // Ali
-	"cogview-3":                 {1, 1},
-	"step-1x-medium":            {1, 1},
+	"dall-e-2":                              {1, 10},
+	"dall-e-3":                              {1, 1}, // OpenAI allows n=1 currently.
+	"ali-stable-diffusion-xl":               {1, 4}, // Ali
+	"ali-stable-diffusion-v1.5":             {1, 4}, // Ali
+	"wanx-v1":                               {1, 4}, // Ali
+	"cogview-3":                             {1, 1},
+	"step-1x-medium":                        {1, 1},
+	"gemini-2.0-flash-exp-image-generation": {1, 10},
 }
 
 var ImagePromptLengthLimitations = map[string]int{

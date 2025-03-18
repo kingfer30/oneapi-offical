@@ -20,6 +20,7 @@ import (
 	"github.com/songquanpeng/one-api/relay/channeltype"
 	"github.com/songquanpeng/one-api/relay/meta"
 	relaymodel "github.com/songquanpeng/one-api/relay/model"
+	"github.com/songquanpeng/one-api/relay/relaymode"
 )
 
 func getImageRequest(c *gin.Context, _ int) (*relaymodel.ImageRequest, error) {
@@ -65,7 +66,7 @@ func getImageSizeRatio(model string, size string) float64 {
 	return 1
 }
 
-func validateImageRequest(imageRequest *relaymodel.ImageRequest, _ *meta.Meta) *relaymodel.ErrorWithStatusCode {
+func validateImageRequest(imageRequest *relaymodel.ImageRequest, meta *meta.Meta) *relaymodel.ErrorWithStatusCode {
 	// check prompt length
 	if imageRequest.Prompt == "" {
 		return openai.ErrorWrapper(errors.New("prompt is required"), "prompt_missing", http.StatusBadRequest)
@@ -83,6 +84,17 @@ func validateImageRequest(imageRequest *relaymodel.ImageRequest, _ *meta.Meta) *
 	// Number of generated images validation
 	if !isWithinRange(imageRequest.Model, imageRequest.N) {
 		return openai.ErrorWrapper(errors.New("invalid value of n"), "n_not_within_range", http.StatusBadRequest)
+	}
+
+	if meta.Mode == relaymode.ImagesEdit {
+		if imageRequest.Image == "" {
+			return openai.ErrorWrapper(errors.New("image is required"), "image_missing", http.StatusBadRequest)
+		}
+	} else {
+		//图片创建的清楚图片编辑
+		if imageRequest.Image != "" {
+			imageRequest.Image = ""
+		}
 	}
 	return nil
 }
@@ -134,8 +146,9 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	c.Set("response_format", imageRequest.ResponseFormat)
 
 	var requestBody io.Reader
+	var jsonStr []byte
 	if isModelMapped || meta.ChannelType == channeltype.Azure { // make Azure channel request body
-		jsonStr, err := json.Marshal(imageRequest)
+		jsonStr, err = json.Marshal(imageRequest)
 		if err != nil {
 			return openai.ErrorWrapper(err, "marshal_image_request_failed", http.StatusInternalServerError)
 		}
@@ -155,22 +168,31 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	case channeltype.Zhipu,
 		channeltype.Ali,
 		channeltype.Replicate,
+		channeltype.Gemini,
 		channeltype.Baidu:
 		finalRequest, err := adaptor.ConvertImageRequest(imageRequest)
 		if err != nil {
 			return openai.ErrorWrapper(err, "convert_image_request_failed", http.StatusInternalServerError)
 		}
-		jsonStr, err := json.Marshal(finalRequest)
+		jsonStr, err = json.Marshal(finalRequest)
 		if err != nil {
 			return openai.ErrorWrapper(err, "marshal_image_request_failed", http.StatusInternalServerError)
 		}
 		requestBody = bytes.NewBuffer(jsonStr)
 	}
+	if len(jsonStr) == 0 {
+		jsonStr, err = json.Marshal(requestBody)
+		if err != nil {
+			return openai.ErrorWrapper(err, "marshal_image_request_failed", http.StatusInternalServerError)
+		}
+	}
+
+	logger.Debugf(c.Request.Context(), "converted request: \n%s", string(jsonStr))
 
 	modelRatio := billingratio.GetModelRatio(imageModel, meta.ChannelType, meta.Group)
 	groupRatio := billingratio.GetGroupRatio(meta.Group)
 	ratio := modelRatio * groupRatio
-	userQuota, err := model.CacheGetUserQuota(ctx, meta.UserId)
+	userQuota, _ := model.CacheGetUserQuota(ctx, meta.UserId)
 
 	var quota int64
 	switch meta.ChannelType {
@@ -192,6 +214,13 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		return openai.ErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
 	}
 
+	// do response
+	usage, respErr := adaptor.DoResponse(c, resp, meta)
+	if respErr != nil {
+		logger.Errorf(ctx, "respErr is not nil: %+v", respErr)
+		return respErr
+	}
+
 	defer func(ctx context.Context) {
 		if resp != nil &&
 			resp.StatusCode != http.StatusCreated && // replicate returns 201
@@ -199,6 +228,10 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 			return
 		}
 
+		//如果返回的token比计算的大, 则使用它的
+		if usage != nil && usage.TotalTokens > int(quota) {
+			quota = int64(usage.TotalTokens)
+		}
 		err := model.PostConsumeTokenQuota(meta.TokenId, quota)
 		if err != nil {
 			logger.SysError("error consuming token remain quota: " + err.Error())
@@ -216,13 +249,6 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 			model.UpdateChannelUsedQuota(channelId, quota)
 		}
 	}(c.Request.Context())
-
-	// do response
-	_, respErr := adaptor.DoResponse(c, resp, meta)
-	if respErr != nil {
-		logger.Errorf(ctx, "respErr is not nil: %+v", respErr)
-		return respErr
-	}
 
 	return nil
 }

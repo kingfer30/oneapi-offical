@@ -9,4 +9,5 @@ type ImageRequest struct {
 	ResponseFormat string `json:"response_format,omitempty"`
 	Style          string `json:"style,omitempty"`
 	User           string `json:"user,omitempty"`
+	Image          string `json:"image,omitempty"`
 }

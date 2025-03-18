@@ -15,6 +15,7 @@ import (
 	"github.com/songquanpeng/one-api/middleware"
 	dbmodel "github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/monitor"
+	"github.com/songquanpeng/one-api/relay/channeltype"
 	"github.com/songquanpeng/one-api/relay/controller"
 	"github.com/songquanpeng/one-api/relay/model"
 	"github.com/songquanpeng/one-api/relay/relaymode"
@@ -27,6 +28,20 @@ func relayHelper(c *gin.Context, relayMode int) *model.ErrorWithStatusCode {
 	switch relayMode {
 	case relaymode.ImagesGenerations:
 		err = controller.RelayImageHelper(c, relayMode)
+	case relaymode.ImagesEdit:
+		if c.GetInt(ctxkey.Channel) == channeltype.Gemini {
+			err = controller.RelayImageHelper(c, relayMode)
+		} else {
+			c.JSON(http.StatusNotImplemented, gin.H{
+				"error": model.Error{
+					Message: "API not implemented",
+					Type:    "one_api_error",
+					Param:   "",
+					Code:    "api_not_implemented",
+				},
+			})
+			return nil
+		}
 	case relaymode.AudioSpeech:
 		fallthrough
 	case relaymode.AudioTranslation:

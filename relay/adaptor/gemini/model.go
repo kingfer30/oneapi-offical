@@ -1,5 +1,7 @@
 package gemini
 
+import relaymodel "github.com/songquanpeng/one-api/relay/model"
+
 type ChatRequest struct {
 	Contents         []ChatContent        `json:"contents"`
 	SafetySettings   []ChatSafetySettings `json:"safety_settings,omitempty"`
@@ -72,14 +74,15 @@ type ChatTools struct {
 }
 
 type ChatGenerationConfig struct {
-	ResponseMimeType string   `json:"responseMimeType,omitempty"`
-	ResponseSchema   any      `json:"responseSchema,omitempty"`
-	Temperature      *float64 `json:"temperature,omitempty"`
-	TopP             *float64 `json:"topP,omitempty"`
-	TopK             float64  `json:"topK,omitempty"`
-	MaxOutputTokens  int      `json:"maxOutputTokens,omitempty"`
-	CandidateCount   int      `json:"candidateCount,omitempty"`
-	StopSequences    any      `json:"stopSequences,omitempty"`
+	ResponseMimeType   string   `json:"responseMimeType,omitempty"`
+	ResponseModalities []string `json:"responseModalities,omitempty"`
+	ResponseSchema     any      `json:"responseSchema,omitempty"`
+	Temperature        *float64 `json:"temperature,omitempty"`
+	TopP               *float64 `json:"topP,omitempty"`
+	TopK               float64  `json:"topK,omitempty"`
+	MaxOutputTokens    int      `json:"maxOutputTokens,omitempty"`
+	CandidateCount     int      `json:"candidateCount,omitempty"`
+	StopSequences      any      `json:"stopSequences,omitempty"`
 	// ThinkingConfig   ThinkingConfig `json:"thinkingConfig,omitempty"`
 }
 type ThinkingConfig struct {
@@ -112,4 +115,22 @@ type UsageMetaData struct {
 	PromptTokenCount     int `json:"promptTokenCount"`
 	CandidatesTokenCount int `json:"candidatesTokenCount"`
 	TotalTokenCount      int `json:"totalTokenCount"`
+}
+
+type ImageRequest struct {
+	Contents         []ChatContent        `json:"contents"`
+	GenerationConfig ChatGenerationConfig `json:"generation_config,omitempty"`
+}
+
+type ImageData struct {
+	Url           string `json:"url,omitempty"`
+	B64Json       string `json:"b64_json,omitempty"`
+	RevisedPrompt string `json:"revised_prompt,omitempty"`
+}
+
+type ImageResponse struct {
+	Created       int64            `json:"created"`
+	Data          []ImageData      `json:"data"`
+	RevisedPrompt string           `json:"revised_prompt,omitempty"`
+	Usage         relaymodel.Usage `json:"usage"`
 }

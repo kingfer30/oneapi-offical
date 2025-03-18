@@ -98,7 +98,15 @@ func (a *Adaptor) ConvertImageRequest(request *model.ImageRequest) (any, error) 
 	if request == nil {
 		return nil, errors.New("request is nil")
 	}
-	return request, nil
+	geminiRequest, err := ConvertImageRequest(*request)
+	if err != nil {
+		b, jerr := json.Marshal(geminiRequest)
+		if jerr == nil {
+			logger.SysErrorf("ConvertImageRequest error : %s\n, %s", err.Error(), string(b))
+		}
+		return nil, err
+	}
+	return geminiRequest, nil
 }
 
 func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Reader) (*http.Response, error) {
@@ -170,6 +178,10 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 			switch meta.Mode {
 			case relaymode.Embeddings:
 				err, usage = EmbeddingHandler(c, resp)
+			case relaymode.ImagesEdit:
+				fallthrough
+			case relaymode.ImagesGenerations:
+				err, usage = ImageHandler(c, resp)
 			default:
 				err, usage = Handler(c, resp, meta)
 			}
