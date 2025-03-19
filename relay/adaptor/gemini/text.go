@@ -352,6 +352,8 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relay
 	responseText := ""
 	var usage *relaymodel.Usage
 	scanner := bufio.NewScanner(resp.Body)
+	maxBufferSize := 1024 * 1024 * 6                  // 6MB
+	scanner.Buffer(make([]byte, 4096), maxBufferSize) // 初始 4KB，最大扩展到 1MB
 	scanner.Split(bufio.ScanLines)
 
 	common.SetEventStreamHeaders(c)
@@ -412,7 +414,6 @@ func Handler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relaymodel.
 	if err != nil {
 		return openai.ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), nil
 	}
-	logger.SysLogf("responseBody: %s", string(responseBody))
 	var geminiResponse ChatResponse
 	err = json.Unmarshal(responseBody, &geminiResponse)
 	if err != nil {

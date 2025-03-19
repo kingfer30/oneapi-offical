@@ -134,3 +134,17 @@ type ImageResponse struct {
 	RevisedPrompt string           `json:"revised_prompt,omitempty"`
 	Usage         relaymodel.Usage `json:"usage"`
 }
+
+type ImageResponse2Chat struct {
+	Role    string                      `json:"role,omitempty"`
+	Content []ImageResponse2ChatContent `json:"content,omitempty"`
+}
+type ImageResponse2ChatContent struct {
+	Type     string                     `json:"type,omitempty"`
+	Text     string                     `json:"text,omitempty"`
+	ImageUrl ImageResponse2ChatImageUrl `json:"image_url,omitempty"`
+}
+type ImageResponse2ChatImageUrl struct {
+	Url    string `json:"url,omitempty"`
+	Detail string `json:"detail,omitempty"`
+}

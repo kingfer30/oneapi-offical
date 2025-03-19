@@ -67,7 +67,6 @@ func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Request, meta *me
 	} else {
 		req.Header.Set("x-goog-api-key", meta.APIKey)
 	}
-
 	req.Header.Set("Host", "generativelanguage.googleapis.com")
 	req.Header.Set("User-Agent", userAgent)
 	return nil
@@ -169,10 +168,16 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 		meta.Thinking = true
 	}
 	if !meta.SelfImplement {
-		//标记了流式 并且 非画图模型, 走流式输出
-		if meta.IsStream && !meta.IsImageModel {
+		//标记了流式 走流式输出
+		if meta.IsStream {
 			var responseText string
-			err, responseText, usage = StreamHandler(c, resp, meta)
+			if meta.IsImageModel {
+				//如果是chat, 但请求的画图模型, 则走画图模型的渲染
+				meta.Image2Chat = true
+				err, responseText, usage = ImageStreamHandler(c, resp, meta)
+			} else {
+				err, responseText, usage = StreamHandler(c, resp, meta)
+			}
 			if err == nil {
 				if usage.PromptTokens == 0 || usage.TotalTokens == 0 {
 					usage = openai.ResponseText2Usage(responseText, meta.ActualModelName, meta.PromptTokens)
@@ -185,12 +190,12 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 			case relaymode.ImagesEdit:
 				fallthrough
 			case relaymode.ImagesGenerations:
-				err, usage = ImageHandler(c, meta, resp)
+				err, usage = ImageHandler(c, resp, meta)
 			default:
 				if meta.IsImageModel {
 					//如果是chat, 但请求的画图模型, 则走画图模型的渲染
 					meta.Image2Chat = true
-					err, usage = ImageHandler(c, meta, resp)
+					err, usage = ImageHandler(c, resp, meta)
 				} else {
 					err, usage = Handler(c, resp, meta)
 				}

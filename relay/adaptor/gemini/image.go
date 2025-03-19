@@ -1,16 +1,20 @@
 package gemini
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/image"
+	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/random"
+	"github.com/songquanpeng/one-api/common/render"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/constant"
 	"github.com/songquanpeng/one-api/relay/meta"
@@ -78,7 +82,125 @@ func ConvertImageRequest(request relaymodel.ImageRequest) (*ImageRequest, error)
 
 	return &imageRequest, nil
 }
-func ImageHandler(c *gin.Context, meta *meta.Meta, resp *http.Response) (*model.ErrorWithStatusCode, *model.Usage) {
+func ImageStreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relaymodel.ErrorWithStatusCode, string, *relaymodel.Usage) {
+	responseText := ""
+	responseFormat := c.GetString("response_format")
+	var usage *relaymodel.Usage
+	scanner := bufio.NewScanner(resp.Body)
+	maxBufferSize := 1024 * 1024 * 6                  // 6MB
+	scanner.Buffer(make([]byte, 4096), maxBufferSize) // 初始 4KB，最大扩展到 1MB
+	scanner.Split(bufio.ScanLines)
+
+	common.SetEventStreamHeaders(c)
+	var content []ImageResponse2ChatContent
+	for scanner.Scan() {
+		data := scanner.Text()
+		data = strings.TrimSpace(data)
+		if !strings.HasPrefix(data, "data: ") {
+			continue
+		}
+		data = strings.TrimPrefix(data, "data: ")
+		data = strings.TrimSuffix(data, "\"")
+		var geminiResponse ChatResponse
+		err := json.Unmarshal([]byte(data), &geminiResponse)
+		if err != nil {
+			logger.SysError("error unmarshalling stream response: " + err.Error())
+			continue
+		}
+
+		//请求画图模型, 但以聊天接口访问的, 按聊天接口的格式返回
+		response, isStop := responseGemini2OpenAIChatStream(&geminiResponse, &content, responseFormat)
+		if response == nil {
+			logger.SysErrorf("error responseGemini2OpenAIChat: response is empty ->%s ", data)
+			continue
+		}
+		response.Model = meta.ActualModelName
+		responseText += response.Choices[0].Delta.StringContent()
+		usage = &relaymodel.Usage{
+			PromptTokens:     geminiResponse.UsageMetadata.PromptTokenCount,
+			CompletionTokens: geminiResponse.UsageMetadata.CandidatesTokenCount,
+			TotalTokens:      geminiResponse.UsageMetadata.TotalTokenCount,
+		}
+		response.Usage = usage
+
+		if len(content) > 0 && isStop {
+			var prompt = ImageResponse2Chat{
+				Role: "assistant",
+			}
+			prompt.Content = content
+			response.SystemPrompt = prompt
+		}
+
+		err = render.ObjectData(c, response)
+		if err != nil {
+			logger.SysError(err.Error())
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		logger.SysError("error reading stream: " + err.Error())
+	}
+
+	render.Done(c)
+
+	err := resp.Body.Close()
+	if err != nil {
+		return openai.ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), "", nil
+	}
+
+	return nil, responseText, usage
+}
+
+func responseGemini2OpenAIChatStream(geminiResponse *ChatResponse, promptContent *[]ImageResponse2ChatContent, respType string) (*openai.ChatCompletionsStreamResponse, bool) {
+	var choice openai.ChatCompletionsStreamResponseChoice
+	var response openai.ChatCompletionsStreamResponse
+	response.Id = fmt.Sprintf("chatcmpl-%s", random.GetUUID())
+	response.Created = helper.GetTimestamp()
+	response.Object = "chat.completion.chunk"
+	text := ""
+	isStop := false
+	if len(geminiResponse.Candidates) > 0 {
+		for i, candidate := range geminiResponse.Candidates {
+			if candidate.FinishReason != "" {
+				choice.FinishReason = &candidate.FinishReason
+			}
+			if strings.ToUpper(candidate.FinishReason) == "STOP" {
+				isStop = true
+			}
+			if len(candidate.Content.Parts) > 0 {
+				for _, item := range candidate.Content.Parts {
+					if item.InlineData != nil {
+						if respType == "b64_json" {
+							text = fmt.Sprintf(`%s![Image_%d](data:%s;base64,%s)`, text, i, item.InlineData.MimeType, item.InlineData.Data)
+						} else {
+							//undo url格式需要上传图床
+							text = fmt.Sprintf(`%s![Image_%d](data:%s;base64,%s)`, text, i, item.InlineData.MimeType, item.InlineData.Data)
+							// text = fmt.Sprintf(`%s\n<img src="%s">`, text, item.InlineData.Data)
+						}
+						*promptContent = append(*promptContent, ImageResponse2ChatContent{
+							Type: "image_url",
+							ImageUrl: ImageResponse2ChatImageUrl{
+								Url:    item.InlineData.Data,
+								Detail: item.InlineData.MimeType,
+							},
+						})
+					} else {
+						text = fmt.Sprintf("%s%s", text, item.Text)
+						*promptContent = append(*promptContent, ImageResponse2ChatContent{
+							Type: "text",
+							Text: text,
+						})
+					}
+				}
+			}
+		}
+	}
+	choice.Delta.Content = text
+	response.Choices = []openai.ChatCompletionsStreamResponseChoice{choice}
+	return &response, isStop
+}
+
+func ImageHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model.ErrorWithStatusCode, *model.Usage) {
 	responseFormat := c.GetString("response_format")
 	var geminiResponse ChatResponse
 	responseBody, err := io.ReadAll(resp.Body)
@@ -89,7 +211,6 @@ func ImageHandler(c *gin.Context, meta *meta.Meta, resp *http.Response) (*model.
 	if err != nil {
 		return openai.ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), nil
 	}
-	log.Print(string(responseBody))
 	err = json.Unmarshal(responseBody, &geminiResponse)
 	if err != nil {
 		return openai.ErrorWrapper(err, "unmarshal_response_body_failed", http.StatusInternalServerError), nil
@@ -117,11 +238,8 @@ func ImageHandler(c *gin.Context, meta *meta.Meta, resp *http.Response) (*model.
 	}
 	var jsonResponse []byte
 	if meta.Image2Chat {
-		//请求画图模型, 但以聊天接口访问的, 按聊天接口的格式返回
-		fullResponse, jerr := responseGemini2OpenAIChat(&geminiResponse, responseFormat)
-		if jerr != nil {
-			return jerr, nil
-		}
+		//请求画图模型, 以chat接口访问的, 按chat接口的格式返回
+		fullResponse := responseGemini2OpenAIChat(&geminiResponse, responseFormat)
 		fullResponse.Usage = usage
 		jsonResponse, err = json.Marshal(fullResponse)
 		if err != nil {
@@ -146,13 +264,17 @@ func ImageHandler(c *gin.Context, meta *meta.Meta, resp *http.Response) (*model.
 	return nil, &usage
 }
 
-func responseGemini2OpenAIChat(response *ChatResponse, respType string) (*openai.TextResponse, *relaymodel.ErrorWithStatusCode) {
+func responseGemini2OpenAIChat(response *ChatResponse, respType string) *openai.TextResponse {
 	fullTextResponse := openai.TextResponse{
 		Id:      fmt.Sprintf("chatcmpl-%s", random.GetUUID()),
 		Object:  "chat.completion",
 		Created: helper.GetTimestamp(),
 		Choices: make([]openai.TextResponseChoice, 0, len(response.Candidates)),
 	}
+	var prompt = ImageResponse2Chat{
+		Role: "assistant",
+	}
+	var promptContent []ImageResponse2ChatContent
 	for i, candidate := range response.Candidates {
 		choice := openai.TextResponseChoice{
 			Index: i,
@@ -163,30 +285,48 @@ func responseGemini2OpenAIChat(response *ChatResponse, respType string) (*openai
 			FinishReason: constant.StopFinishReason,
 		}
 		if len(candidate.Content.Parts) > 0 {
-			text := ""
-			for _, item := range candidate.Content.Parts {
-				text = ""
-				if item.InlineData != nil {
-					if respType == "b64_json" {
-						text = fmt.Sprintf(`%s\n<img src="data:%s;base64,%s">`, text, item.InlineData.MimeType, item.InlineData.Data)
+			if candidate.Content.Parts[0].FunctionCall != nil {
+				choice.Message.ToolCalls = getToolCalls(&candidate)
+			} else {
+				for i, item := range candidate.Content.Parts {
+					content := ""
+					if item.InlineData != nil {
+						if respType == "b64_json" {
+							content = fmt.Sprintf("%s![Image_%d](data:%s;base64,%s)", choice.Message.Content, i, item.InlineData.MimeType, item.InlineData.Data)
+						} else {
+							//undo url格式需要上传图床
+							content = fmt.Sprintf("%s![Image_%d](data:%s;base64,%s)", choice.Message.Content, i, item.InlineData.MimeType, item.InlineData.Data)
+						}
+						promptContent = append(promptContent, ImageResponse2ChatContent{
+							Type: "image_url",
+							ImageUrl: ImageResponse2ChatImageUrl{
+								Url:    item.InlineData.Data,
+								Detail: item.InlineData.MimeType,
+							},
+						})
 					} else {
-						//undo url格式需要上传图床
-						text = fmt.Sprintf(`%s\n<img src="data:%s;base64,%s">`, text, item.InlineData.MimeType, item.InlineData.Data)
-						// text = fmt.Sprintf(`%s\n<img src="%s">`, text, item.InlineData.Data)
+						if i == 0 {
+							content = item.Text
+						} else {
+							content = fmt.Sprintf("%s\n%s", choice.Message.Content, item.Text)
+						}
+						promptContent = append(promptContent, ImageResponse2ChatContent{
+							Type: "text",
+							Text: content,
+						})
 					}
-				} else {
-					text = fmt.Sprintf("%s\n%s", text, item.Text)
+					choice.Message.Content = content
 				}
 			}
-			choice.Message.Content = text
 		} else {
 			choice.Message.Content = ""
 			choice.FinishReason = candidate.FinishReason
 		}
 		fullTextResponse.Choices = append(fullTextResponse.Choices, choice)
 	}
-
-	return &fullTextResponse, nil
+	prompt.Content = promptContent
+	fullTextResponse.SystemPrompt = prompt
+	return &fullTextResponse
 }
 
 func responseGemini2OpenAIImage(response *ChatResponse, respType string) (*ImageResponse, *relaymodel.ErrorWithStatusCode) {

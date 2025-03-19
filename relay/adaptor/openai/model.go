@@ -89,12 +89,13 @@ type TextResponseChoice struct {
 }
 
 type TextResponse struct {
-	Id          string               `json:"id"`
-	Model       string               `json:"model,omitempty"`
-	Object      string               `json:"object"`
-	Created     int64                `json:"created"`
-	Choices     []TextResponseChoice `json:"choices"`
-	model.Usage `json:"usage"`
+	Id           string               `json:"id"`
+	Model        string               `json:"model,omitempty"`
+	Object       string               `json:"object"`
+	Created      int64                `json:"created"`
+	Choices      []TextResponseChoice `json:"choices"`
+	SystemPrompt any                  `json:"system_prompt,omitempty"`
+	model.Usage  `json:"usage"`
 }
 
 type EmbeddingResponseItem struct {
@@ -129,12 +130,13 @@ type ChatCompletionsStreamResponseChoice struct {
 }
 
 type ChatCompletionsStreamResponse struct {
-	Id      string                                `json:"id"`
-	Object  string                                `json:"object"`
-	Created int64                                 `json:"created"`
-	Model   string                                `json:"model"`
-	Choices []ChatCompletionsStreamResponseChoice `json:"choices"`
-	Usage   *model.Usage                          `json:"usage,omitempty"`
+	Id           string                                `json:"id"`
+	Object       string                                `json:"object"`
+	Created      int64                                 `json:"created"`
+	Model        string                                `json:"model"`
+	Choices      []ChatCompletionsStreamResponseChoice `json:"choices"`
+	Usage        *model.Usage                          `json:"usage,omitempty"`
+	SystemPrompt any                                   `json:"system_prompt,omitempty"`
 }
 
 type CompletionsStreamResponse struct {
