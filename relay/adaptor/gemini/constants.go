@@ -39,6 +39,7 @@ var ModelList = []string{
 //定义支持画图的模型
 var ImageModelList = []string{
 	"gemini-2.0-flash-exp-image-generation",
+	"gemini-2.0-flash-exp",
 }
 
 func IsImageModel(name string) bool {

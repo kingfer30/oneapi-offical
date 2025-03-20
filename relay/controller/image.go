@@ -3,11 +3,14 @@ package controller
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"runtime"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common"
@@ -25,9 +28,56 @@ import (
 
 func getImageRequest(c *gin.Context, _ int) (*relaymodel.ImageRequest, error) {
 	imageRequest := &relaymodel.ImageRequest{}
-	err := common.UnmarshalBodyReusable(c, imageRequest)
-	if err != nil {
-		return nil, err
+	if strings.HasPrefix(c.Request.Header.Get("Content-Type"), "application/json") {
+		err := common.UnmarshalBodyReusable(c, imageRequest)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		//非json格式转为带form的结构体
+		var imageFormRequest relaymodel.ImageFormRequest
+		err := common.UnmarshalBodyReusable(c, &imageFormRequest)
+		if err != nil {
+			return nil, err
+		}
+		logger.SysLogf("转换成功, %s, %s, %d, %s", imageFormRequest.Model, imageFormRequest.Prompt, imageFormRequest.N, imageFormRequest.Size)
+		imageRequest.Model = imageFormRequest.Model
+		imageRequest.N = imageFormRequest.N
+		imageRequest.Prompt = imageFormRequest.Prompt
+		imageRequest.Quality = imageFormRequest.Quality
+		imageRequest.Size = imageFormRequest.Size
+		//将上传图片转为b64
+		file, err := imageFormRequest.Image.Open()
+		if err != nil {
+			return nil, fmt.Errorf("failed to open file: %w", err)
+		}
+		defer file.Close()
+		var encodedBuilder strings.Builder
+		encoder := base64.NewEncoder(base64.StdEncoding, &encodedBuilder)
+		defer encoder.Close()
+
+		// 设置内存安全限制（示例设为20MB）
+		const maxSize = 20 << 20 // 20MB
+		limitedReader := io.LimitReader(file, maxSize)
+
+		bytesCopied, err := io.Copy(encoder, limitedReader) // 流式处理
+		if err != nil {
+			return nil, fmt.Errorf("image reading error: %v", err)
+		}
+		// 检查是否超过大小限制
+		if bytesCopied >= maxSize {
+			var m runtime.MemStats
+			runtime.ReadMemStats(&m)
+			logger.SysLogf("Memory usage: HeapInuse=%v MiB", m.HeapInuse/1024/1024)
+			logger.SysLogf("images is too large: %s,", imageFormRequest.Image.Filename)
+			return nil, fmt.Errorf("image exceeds maximum allowed size")
+		}
+
+		// 确保所有数据刷新到builder
+		if err := encoder.Close(); err != nil {
+			return nil, fmt.Errorf("base64 close error: %w", err)
+		}
+		imageRequest.Image = encodedBuilder.String()
 	}
 	if imageRequest.N == 0 {
 		imageRequest.N = 1

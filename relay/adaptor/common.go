@@ -3,14 +3,19 @@ package adaptor
 import (
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common/client"
 	"github.com/songquanpeng/one-api/relay/meta"
-	"io"
-	"net/http"
 )
 
 func SetupCommonRequestHeader(c *gin.Context, req *http.Request, meta *meta.Meta) {
+	if strings.HasPrefix(c.Request.Header.Get("Content-Type"), "multipart/form-data") {
+		c.Request.Header.Set("Content-Type", "application/json")
+	}
 	req.Header.Set("Content-Type", c.Request.Header.Get("Content-Type"))
 	req.Header.Set("Accept", c.Request.Header.Get("Accept"))
 	if meta.IsStream && c.Request.Header.Get("Accept") == "" {
