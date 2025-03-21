@@ -271,7 +271,7 @@ func generateParts(c *gin.Context, message relaymodel.Message) ([]genai.Part, er
 				return nil, err
 			}
 			if ok {
-				mimeType, fileData, err = FileHandler(c, part.ImageURL.Url, "", "")
+				mimeType, fileData, err = FileHandler(c, part.ImageURL.Url, part.ImageURL.Url, "", "")
 				if err != nil {
 					return nil, err
 				}

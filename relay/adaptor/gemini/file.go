@@ -16,10 +16,10 @@ import (
 )
 
 // 文件上传处理
-func FileHandler(c *gin.Context, url string, contentType string, fileName string) (string, string, error) {
+func FileHandler(c *gin.Context, fieldUrl string, url string, contentType string, fileName string) (string, string, error) {
 	meta := meta.GetByContext(c)
 	//判断文件是否已经存在
-	fileOld, err := model.GetFile(url)
+	fileOld, err := model.GetFile(fieldUrl)
 	if err != nil {
 		return "", "", fmt.Errorf("get old file error: %s", err.Error())
 	}
@@ -96,7 +96,7 @@ func FileHandler(c *gin.Context, url string, contentType string, fileName string
 		Key:         currentKey,
 		ContentType: contentType,
 		ChannelId:   meta.ChannelId,
-		Url:         url,
+		Url:         fieldUrl,
 		FileId:      file.URI,
 	}
 	err, fileId := fileModel.SaveFile()

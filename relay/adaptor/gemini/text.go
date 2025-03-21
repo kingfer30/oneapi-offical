@@ -120,7 +120,7 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 					return nil, err
 				}
 				if ok {
-					mimeType, fileData, err = FileHandler(c, part.ImageURL.Url, "", "")
+					mimeType, fileData, err = FileHandler(c, part.ImageURL.Url, part.ImageURL.Url, "", "")
 					if err != nil {
 						return nil, err
 					}
@@ -135,13 +135,13 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 					// 一种后台统一开启, 一种是chat对话中使用了画图模型, 强制开启
 					if config.GeminiUploadImageEnabled || IsImageModel(textRequest.Model) {
 						fileName := ""
-						url := ""
+						fieldUrl := ""
 						if strings.HasPrefix(part.ImageURL.Url, "http") || strings.HasPrefix(part.ImageURL.Url, "https") {
-							url = part.ImageURL.Url
+							fieldUrl = part.ImageURL.Url
 						} else {
-							url = random.StrToMd5(part.ImageURL.Url)
+							fieldUrl = random.StrToMd5(part.ImageURL.Url)
 						}
-						fileOld, err := model.GetFile(part.ImageURL.Url)
+						fileOld, err := model.GetFile(fieldUrl)
 						if err != nil || fileOld == nil {
 							//为空则 重新获取
 							mimeType, fileName, err = image.GetImageFromUrl(part.ImageURL.Url, true)
@@ -150,7 +150,7 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 							}
 						}
 
-						mimeType, fileData, err = FileHandler(c, url, mimeType, fileName)
+						mimeType, fileData, err = FileHandler(c, fieldUrl, part.ImageURL.Url, mimeType, fileName)
 						if err != nil {
 							return nil, err
 						}
