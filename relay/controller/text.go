@@ -67,7 +67,7 @@ func RelayTextHelper(c *gin.Context) *model.ErrorWithStatusCode {
 
 	// no need to convert request for self-implement
 	var resp *http.Response
-	if !meta.SelfImplement && meta.Mode != relaymode.Embeddings {
+	if !meta.SelfImplement || meta.Mode == relaymode.Embeddings {
 		// get request body
 		requestBody, err := getRequestBody(c, meta, textRequest, adaptor)
 		if err != nil {

@@ -11,6 +11,7 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"regexp"
@@ -20,6 +21,7 @@ import (
 
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/client"
+	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/random"
 
 	"github.com/songquanpeng/one-api/common/logger"
@@ -91,12 +93,23 @@ func IsImageUrl(url string) (bool, error) {
 		//先改为正常请求, 再次报错再进行异常抛出
 		resp, err = imageClient.Get(url)
 		if err != nil {
-			logger.SysLog(fmt.Sprintf("HTTPClient报错: %s", err.Error()))
+			logger.SysLog(fmt.Sprintf("IsImageUrl - HTTPClient报错: %s", err.Error()))
 			return false, err
 		}
 	}
 	if !strings.HasPrefix(resp.Header.Get("Content-Type"), "image/") {
-		logger.SysLog(fmt.Sprintf("Content-Type错误: %s", resp.Header.Get("Content-Type")))
+		//读取响应体
+		_, err := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		if err != nil {
+			// 获取并解析Content-Type
+			// contentType := resp.Header.Get("Content-Type")
+			// mediaType, _, _ := mime.ParseMediaType(contentType)
+			logger.SysLog(fmt.Sprintf("IsImageUrl - io.ReadAll: %s", resp.Header.Get("Content-Type")))
+			setImageCache(url, false, "", 0, 0, "")
+			return false, nil
+		}
+		logger.SysLog(fmt.Sprintf("IsImageUrl - Content-Type错误: %s", resp.Header.Get("Content-Type")))
 		setImageCache(url, false, "", 0, 0, "")
 		return false, nil
 	}
@@ -206,9 +219,9 @@ func getImageFormat(input string, saveLocal bool) (string, string, error) {
 	}
 	if saveLocal {
 		//保存到本地文件
-		file, err := saveWithStream(input, t)
+		file, err := SaveWithStream(input, t)
 		if err != nil {
-			return "", "", fmt.Errorf("fail to saveWithStream: %s", err)
+			return "", "", fmt.Errorf("fail to SaveWithStream: %s", err)
 		}
 		setImageCache(source, true, contentType, 0, 0, file)
 		return contentType, file, nil
@@ -217,7 +230,7 @@ func getImageFormat(input string, saveLocal bool) (string, string, error) {
 }
 
 // 流式保存函数（内存安全版）
-func saveWithStream(base64Data string, ext string) (string, error) {
+func SaveWithStream(base64Data string, ext string) (string, error) {
 	// 1. 创建解码流（复用格式检测后的纯净Base64数据）
 	decoder := base64.NewDecoder(base64.StdEncoding, strings.NewReader(base64Data))
 
@@ -225,12 +238,12 @@ func saveWithStream(base64Data string, ext string) (string, error) {
 	dirPath := "/mnt/tpm_file"
 	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
 		if err := os.MkdirAll(dirPath, 0755); err != nil {
-			logger.SysLogf("saveWithStream - Error: MkdirAll temporary file: %s =>create dic failed: %s", dirPath, err)
-			return "", fmt.Errorf("saveWithStream - Error: %v", err)
+			logger.SysLogf("SaveWithStream - Error: MkdirAll temporary file: %s =>create dic failed: %s", dirPath, err)
+			return "", fmt.Errorf("SaveWithStream - Error: %v", err)
 		}
 	} else if err != nil {
 		// 其他错误
-		logger.SysLogf("saveWithStream - Error: MkdirAll temporary file: %s =>create dic error failed : %s", dirPath, err)
+		logger.SysLogf("SaveWithStream - Error: MkdirAll temporary file: %s =>create dic error failed : %s", dirPath, err)
 		return "", err
 	}
 
@@ -238,25 +251,25 @@ func saveWithStream(base64Data string, ext string) (string, error) {
 	tmp_name := fmt.Sprintf("tmpfile_%s.%s", random.GetRandomNumberString(16), ext)
 	tmpFile, err := os.CreateTemp(dirPath, tmp_name)
 	if err != nil {
-		logger.SysLogf("saveWithStream - Error: creating temporary file: %s => %s", tmp_name, err)
-		return "", fmt.Errorf("saveWithStream - Error: %v", err)
+		logger.SysLogf("SaveWithStream - Error: creating temporary file: %s => %s", tmp_name, err)
+		return "", fmt.Errorf("SaveWithStream - Error: %v", err)
 	}
 	defer tmpFile.Close()
 
 	// 4. 使用带内存限制的流式拷贝
 	bufferedWriter := bufio.NewWriterSize(tmpFile, 32*1024) // 32KB缓冲区
 	if _, err := io.CopyN(bufferedWriter, decoder, 20*1024*1024); err != nil && err != io.EOF {
-		logger.SysLogf("saveWithStream - Error: io.CopyN: %s => %s", tmp_name, err)
+		logger.SysLogf("SaveWithStream - Error: io.CopyN: %s => %s", tmp_name, err)
 		return "", fmt.Errorf("流式拷贝失败: %v", err)
 	}
 	if err := bufferedWriter.Flush(); err != nil {
-		logger.SysLogf("saveWithStream - Error: bufferedWriter.Flush: %s => %s", tmp_name, err)
+		logger.SysLogf("SaveWithStream - Error: bufferedWriter.Flush: %s => %s", tmp_name, err)
 		return "", fmt.Errorf("缓冲写入失败: %v", err)
 	}
 
 	// 5. 原子重命名确保完整性
 	if err := os.Rename(tmpFile.Name(), (dirPath + "/" + tmp_name)); err != nil {
-		logger.SysLogf("saveWithStream - Error: os.Rename: %s => %s", (dirPath + "/" + tmp_name), err)
+		logger.SysLogf("SaveWithStream - Error: os.Rename: %s => %s", (dirPath + "/" + tmp_name), err)
 		return "", fmt.Errorf("文件重命名失败: %v", err)
 	}
 	return (dirPath + "/" + tmp_name), nil
@@ -322,9 +335,9 @@ func GetImageFromUrl(url string, saveLocal bool) (mimeType string, data string, 
 			ext = t[1]
 		}
 		//保存到本地文件
-		file, err := saveWithStream(data, ext)
+		file, err := SaveWithStream(data, ext)
 		if err != nil {
-			return "", "", fmt.Errorf("fail to saveWithStream: %s", err)
+			return "", "", fmt.Errorf("fail to SaveWithStream: %s", err)
 		}
 		setImageCache(url, true, parts[0], 0, 0, file)
 		return parts[0], file, nil
@@ -365,4 +378,126 @@ func GetImageSize(image string) (width int, height int, err error) {
 		return GetImageSizeFromUrl(image)
 	}
 	return GetImageSizeFromBase64(image)
+}
+
+type UploadResponse []struct {
+	Src string `json:"src"`
+}
+
+// 流式上传图片到图床
+func StreamUploadByB64(b64Data string, mimeType string) (string, string, error) {
+	parts := strings.Split(mimeType, "/")
+	extension := ""
+	if len(parts) != 2 {
+		extension = "png"
+	}
+	extension = parts[1]
+	filePath, err := SaveWithStream(b64Data, extension)
+	if err != nil {
+		logger.SysErrorf("StreamUploadByB64 - SaveWithStream err: %s", err.Error())
+		return "", "", err
+	}
+
+	filename := fmt.Sprintf("%s.%s", random.GetRandomString(16), extension)
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		logger.SysLogf("StreamUploadByB64 - os.Open err: %s", err.Error())
+		return "", "", err
+	}
+	defer file.Close()
+
+	// 重试机制
+	var src string
+	var maxRetries = 3 // 最大重试次数
+	for i := 0; i < maxRetries; i++ {
+		// 创建管道连接解码和上传
+		pr, pw := io.Pipe()
+		errChan := make(chan error, 1)
+		writer := multipart.NewWriter(pw)
+
+		defer pw.Close()
+		go func() {
+			defer pw.Close()
+			defer writer.Close()
+			part, _ := writer.CreateFormFile("file", filename)
+			if err != nil {
+				errChan <- err
+				return
+			}
+
+			if _, err := io.Copy(part, file); err != nil {
+				errChan <- err
+				return
+			}
+			errChan <- nil
+		}()
+
+		// 在主goroutine中检查错误
+		select {
+		case err := <-errChan:
+			if err != nil {
+				logger.SysLogf("StreamUploadByB64 - io.Copy err: %s", err.Error())
+				return "", "", err
+			}
+		default:
+			// 正常继续执行
+		}
+		// 创建请求
+		req, err := http.NewRequest("POST", fmt.Sprintf("%s/upload", config.GeminiImgUploadDomain), pr)
+		if err != nil {
+			logger.SysLogf("StreamUploadByB64 - NewRequest err: %s", err.Error())
+			return "", "", err
+		}
+
+		// 设置Content-Type
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+
+		resp, err := client.HTTPClient.Do(req)
+		if err == nil {
+			defer resp.Body.Close()
+			// 只处理200状态码
+			if resp.StatusCode != http.StatusOK {
+				logger.SysLogf("StreamUploadByB64 - StatusCode err: %d", resp.StatusCode)
+				return "", "", fmt.Errorf("file upload fail - status : %d", resp.StatusCode)
+			}
+
+			// 读取并解析响应
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				logger.SysLogf("StreamUploadByB64 - ReadAll err: %s", err.Error())
+				return "", "", fmt.Errorf("file upload fail - err: %s", err.Error())
+			}
+			logger.SysLogf("StreamUploadByB64 - done status: %s, detail: %s", resp.Status, string(body))
+
+			var result UploadResponse
+			if err := json.Unmarshal(body, &result); err != nil {
+				logger.SysLogf("StreamUploadByB64 - Unmarshal err: %s", err.Error())
+				return "", "", fmt.Errorf("JSON解析失败: %v", err.Error())
+			}
+
+			// 验证响应格式
+			if len(result) == 0 || result[0].Src == "" {
+				logger.SysLogf("StreamUploadByB64 - empty result: %s", string(body))
+				return "", "", fmt.Errorf("file upload fail - empty response")
+			}
+			src = result[0].Src
+			break
+		} else {
+			logger.SysLogf("StreamUploadByB64 - Post - %s error: , retrying", err)
+			if resp != nil {
+				defer resp.Body.Close()
+				body, err := io.ReadAll(resp.Body)
+				if err == nil {
+					logger.SysLogf("StreamUploadByB64 - Post - %s error, status : %s, detail: %s", config.GeminiImgUploadDomain, resp.Status, string(body))
+				}
+			}
+		}
+	}
+
+	if src == "" {
+		logger.SysLog("StreamUploadByB64 - empty url, exceed maximum upload retries")
+		return "", "", fmt.Errorf("file upload fail - exceed maximum upload retries")
+	}
+	return fmt.Sprintf("%s%s", config.GeminiImgUploadDomain, src), filePath, nil
 }

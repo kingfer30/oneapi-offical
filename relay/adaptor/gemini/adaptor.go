@@ -167,7 +167,7 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 	if c.GetBool("hua_thinking") {
 		meta.Thinking = true
 	}
-	if !meta.SelfImplement {
+	if !meta.SelfImplement || meta.Mode == relaymode.Embeddings {
 		//标记了流式 走流式输出
 		if meta.IsStream {
 			var responseText string

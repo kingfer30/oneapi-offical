@@ -38,7 +38,6 @@ func syncUpdateChannel() {
 // DisableChannel disable & notify
 func SleepChannel(channelId int, channelName string, awakeTime int64) {
 	model.SleepChannel(channelId, awakeTime)
-	logger.SysLog(fmt.Sprintf("channel #%d has been disabled: %s", channelId, "自动睡眠"))
 	//异步执行更新
 	syncUpdateChannel()
 }

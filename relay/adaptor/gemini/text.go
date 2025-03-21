@@ -11,6 +11,7 @@ import (
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/media"
 	"github.com/songquanpeng/one-api/common/render"
+	"github.com/songquanpeng/one-api/model"
 
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/helper"
@@ -84,10 +85,6 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 	for k, message := range textRequest.Messages {
 		msg := message.StringContent()
 		if msg == "" {
-			b, jerr := json.Marshal(textRequest)
-			if jerr == nil {
-				logger.SysLog(fmt.Sprintf("Gemini-Text-Empty: %s", string(b)))
-			}
 			msg = "Hi"
 		}
 		content := ChatContent{
@@ -135,12 +132,25 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 					})
 				} else {
 					// 这里图片统一转为File, 因为base64经常报错
-					if config.GeminiUploadImageEnabled {
-						mimeType, fileName, err := image.GetImageFromUrl(part.ImageURL.Url, true)
-						if err != nil {
-							return nil, err
+					// 一种后台统一开启, 一种是chat对话中使用了画图模型, 强制开启
+					if config.GeminiUploadImageEnabled || IsImageModel(textRequest.Model) {
+						fileName := ""
+						url := ""
+						if strings.HasPrefix(part.ImageURL.Url, "http") || strings.HasPrefix(part.ImageURL.Url, "https") {
+							url = part.ImageURL.Url
+						} else {
+							url = random.StrToMd5(part.ImageURL.Url)
 						}
-						mimeType, fileData, err = FileHandler(c, random.StrToMd5(part.ImageURL.Url), mimeType, fileName)
+						fileOld, err := model.GetFile(part.ImageURL.Url)
+						if err != nil || fileOld == nil {
+							//为空则 重新获取
+							mimeType, fileName, err = image.GetImageFromUrl(part.ImageURL.Url, true)
+							if err != nil {
+								return nil, err
+							}
+						}
+
+						mimeType, fileData, err = FileHandler(c, url, mimeType, fileName)
 						if err != nil {
 							return nil, err
 						}

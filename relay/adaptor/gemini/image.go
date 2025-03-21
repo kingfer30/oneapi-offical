@@ -84,7 +84,6 @@ func ConvertImageRequest(request relaymodel.ImageRequest) (*ImageRequest, error)
 }
 func ImageStreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relaymodel.ErrorWithStatusCode, string, *relaymodel.Usage) {
 	responseText := ""
-	responseFormat := c.GetString("response_format")
 	var usage *relaymodel.Usage
 	scanner := bufio.NewScanner(resp.Body)
 	maxBufferSize := 1024 * 1024 * 6                  // 6MB
@@ -109,7 +108,7 @@ func ImageStreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*
 		}
 
 		//请求画图模型, 但以聊天接口访问的, 按聊天接口的格式返回
-		response, isStop := responseGemini2OpenAIChatStream(&geminiResponse, &content, responseFormat)
+		response, isStop := responseGemini2OpenAIChatStream(c, &geminiResponse, &content)
 		if response == nil {
 			logger.SysErrorf("error responseGemini2OpenAIChat: response is empty ->%s ", data)
 			continue
@@ -151,7 +150,7 @@ func ImageStreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*
 	return nil, responseText, usage
 }
 
-func responseGemini2OpenAIChatStream(geminiResponse *ChatResponse, promptContent *[]ImageResponse2ChatContent, respType string) (*openai.ChatCompletionsStreamResponse, bool) {
+func responseGemini2OpenAIChatStream(c *gin.Context, geminiResponse *ChatResponse, promptContent *[]ImageResponse2ChatContent) (*openai.ChatCompletionsStreamResponse, bool) {
 	var choice openai.ChatCompletionsStreamResponseChoice
 	var response openai.ChatCompletionsStreamResponse
 	response.Id = fmt.Sprintf("chatcmpl-%s", random.GetUUID())
@@ -170,17 +169,21 @@ func responseGemini2OpenAIChatStream(geminiResponse *ChatResponse, promptContent
 			if len(candidate.Content.Parts) > 0 {
 				for _, item := range candidate.Content.Parts {
 					if item.InlineData != nil {
-						if respType == "b64_json" {
+						// 这里是chat聊天模型, 直接将返回的b64转url, 不返回b64格式
+						//url格式需要上传图床
+						url, fileName, err := image.StreamUploadByB64(item.InlineData.Data, item.InlineData.MimeType)
+						if err != nil {
+							//上传失败, 仍然返回base64
 							text = fmt.Sprintf(`%s![Image_%d](data:%s;base64,%s)`, text, i, item.InlineData.MimeType, item.InlineData.Data)
 						} else {
-							//undo url格式需要上传图床
-							text = fmt.Sprintf(`%s![Image_%d](data:%s;base64,%s)`, text, i, item.InlineData.MimeType, item.InlineData.Data)
-							// text = fmt.Sprintf(`%s\n<img src="%s">`, text, item.InlineData.Data)
+							text = fmt.Sprintf(`%s![Image_%d](%s)`, text, i, url)
 						}
+						//这里, 将图片再次异步上传给gemini, 方便下次使用
+						syncUploadImg2Gemini(c, item.InlineData.MimeType, fileName, url)
 						*promptContent = append(*promptContent, ImageResponse2ChatContent{
 							Type: "image_url",
 							ImageUrl: ImageResponse2ChatImageUrl{
-								Url:    item.InlineData.Data,
+								Url:    url,
 								Detail: item.InlineData.MimeType,
 							},
 						})
@@ -239,7 +242,7 @@ func ImageHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model.
 	var jsonResponse []byte
 	if meta.Image2Chat {
 		//请求画图模型, 以chat接口访问的, 按chat接口的格式返回
-		fullResponse := responseGemini2OpenAIChat(&geminiResponse, responseFormat)
+		fullResponse := responseGemini2OpenAIChat(c, &geminiResponse)
 		fullResponse.Usage = usage
 		jsonResponse, err = json.Marshal(fullResponse)
 		if err != nil {
@@ -264,7 +267,7 @@ func ImageHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model.
 	return nil, &usage
 }
 
-func responseGemini2OpenAIChat(response *ChatResponse, respType string) *openai.TextResponse {
+func responseGemini2OpenAIChat(c *gin.Context, response *ChatResponse) *openai.TextResponse {
 	fullTextResponse := openai.TextResponse{
 		Id:      fmt.Sprintf("chatcmpl-%s", random.GetUUID()),
 		Object:  "chat.completion",
@@ -291,16 +294,21 @@ func responseGemini2OpenAIChat(response *ChatResponse, respType string) *openai.
 				for i, item := range candidate.Content.Parts {
 					content := ""
 					if item.InlineData != nil {
-						if respType == "b64_json" {
-							content = fmt.Sprintf("%s![Image_%d](data:%s;base64,%s)", choice.Message.Content, i, item.InlineData.MimeType, item.InlineData.Data)
+						// 这里是chat聊天模型, 直接将返回的b64转url, 不返回b64格式
+						//url格式需要上传图床
+						url, fileName, err := image.StreamUploadByB64(item.InlineData.Data, item.InlineData.MimeType)
+						if err != nil {
+							//上传失败, 仍然返回base64
+							content = fmt.Sprintf(`%s![Image_%d](data:%s;base64,%s)`, choice.Message.Content, i, item.InlineData.MimeType, item.InlineData.Data)
 						} else {
-							//undo url格式需要上传图床
-							content = fmt.Sprintf("%s![Image_%d](data:%s;base64,%s)", choice.Message.Content, i, item.InlineData.MimeType, item.InlineData.Data)
+							content = fmt.Sprintf(`%s![Image_%d](%s)`, choice.Message.Content, i, url)
 						}
+						//这里, 将图片再次异步上传给gemini, 方便下次使用
+						syncUploadImg2Gemini(c, item.InlineData.MimeType, fileName, url)
 						promptContent = append(promptContent, ImageResponse2ChatContent{
 							Type: "image_url",
 							ImageUrl: ImageResponse2ChatImageUrl{
-								Url:    item.InlineData.Data,
+								Url:    url,
 								Detail: item.InlineData.MimeType,
 							},
 						})
@@ -341,9 +349,13 @@ func responseGemini2OpenAIImage(response *ChatResponse, respType string) (*Image
 							B64Json: item.InlineData.Data,
 						})
 					} else {
-						//undo url格式需要上传图床
+						//url格式需要上传图床
+						url, _, err := image.StreamUploadByB64(item.InlineData.Data, item.InlineData.MimeType)
+						if err != nil {
+							return nil, openai.ErrorWrapper(err, "upload_image", http.StatusBadRequest)
+						}
 						imgList = append(imgList, ImageData{
-							Url: item.InlineData.Data,
+							Url: url,
 						})
 					}
 				} else {
@@ -361,4 +373,17 @@ func responseGemini2OpenAIImage(response *ChatResponse, respType string) (*Image
 		RevisedPrompt: text,
 	}
 	return &image, nil
+}
+
+// 异步上传文件到gemini, 这里是针对chat模型做的优化, 可以加快聊天响应速度
+func syncUploadImg2Gemini(c *gin.Context, mimeType string, filePath string, url string) {
+	go func() {
+		_, fileData, err := FileHandler(c, url, mimeType, filePath)
+		if err != nil {
+			meta := meta.GetByContext(c)
+			logger.SysErrorf("syncUploadImg2Gemini - FileHandler err: %s, api-key: %s", err.Error(), meta.APIKey)
+			return
+		}
+		logger.SysLogf("sync upload image to gemini success : %s", fileData)
+	}()
 }

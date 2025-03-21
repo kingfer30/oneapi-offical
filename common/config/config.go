@@ -122,6 +122,8 @@ var SyncFrequency = env.Int("SYNC_FREQUENCY", 10*60) // unit is second
 var BatchUpdateEnabled = false
 var BatchUpdateInterval = env.Int("BATCH_UPDATE_INTERVAL", 5)
 
+var GeminiImgUploadDomain = os.Getenv("GEMINI_IMG_UPLOAD_DOMAIN")
+
 var RelayTimeout = env.Int("RELAY_TIMEOUT", 0) // unit is second
 
 var GeminiSafetySetting = env.String("GEMINI_SAFETY_SETTING", "BLOCK_NONE")
