@@ -132,8 +132,8 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 					})
 				} else {
 					// 这里图片统一转为File, 因为base64经常报错
-					// 一种后台统一开启, 一种是chat对话中使用了画图模型, 强制开启
-					if config.GeminiUploadImageEnabled || IsImageModel(textRequest.Model) {
+					// 一种后台统一开启, 一种是chat对话中使用了画图模型, 系统类型的也强制开启, 用户的不管
+					if config.GeminiUploadImageEnabled || (IsImageModel(textRequest.Model) && content.Role != "user") {
 						fileName := ""
 						fieldUrl := ""
 						if strings.HasPrefix(part.ImageURL.Url, "http") || strings.HasPrefix(part.ImageURL.Url, "https") {
