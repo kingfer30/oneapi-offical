@@ -279,8 +279,12 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		}
 
 		//如果返回的token比计算的大, 则使用它的
+		prompt := 0
+		completion := 0
 		if usage != nil && usage.TotalTokens > int(quota) {
 			quota = int64(usage.TotalTokens)
+			prompt = usage.PromptTokens
+			completion = usage.CompletionTokens
 		}
 		err := model.PostConsumeTokenQuota(meta.TokenId, quota)
 		if err != nil {
@@ -293,7 +297,7 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		if quota != 0 {
 			tokenName := c.GetString(ctxkey.TokenName)
 			logContent := fmt.Sprintf("模型倍率 %.2f，分组倍率 %.2f", modelRatio, groupRatio)
-			model.RecordConsumeLog(ctx, meta.UserId, meta.ChannelId, 0, 0, imageRequest.Model, tokenName, quota, logContent)
+			model.RecordConsumeLog(ctx, meta.UserId, meta.ChannelId, prompt, completion, imageRequest.Model, tokenName, quota, logContent)
 			model.UpdateUserUsedQuotaAndRequestCount(meta.UserId, quota)
 			channelId := c.GetInt(ctxkey.ChannelId)
 			model.UpdateChannelUsedQuota(channelId, quota)
