@@ -127,8 +127,13 @@ func SaveMediaByUrl(url string) (error, string, string) {
 
 	// 检查响应状态码
 	if resp.StatusCode != http.StatusOK {
-		logger.SysLogf("SaveMediaByUrl - Error: received non-200 response status: %s\n", resp.Status)
-		return err, "", ""
+		detail := ""
+		body, err := io.ReadAll(resp.Body)
+		if err == nil && body != nil {
+			detail = string(body)
+		}
+		logger.SysLogf("SaveMediaByUrl - Error: received non-200 response status: %s\n - %s\n - %s", url, resp.Status, detail)
+		return fmt.Errorf("failed to get this url : %s, status : %s", url, resp.Status), "", ""
 	}
 	extension := filepath.Ext(url)
 	if extension == "" {
