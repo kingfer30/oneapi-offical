@@ -11,6 +11,7 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
+	"mime"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -79,13 +80,13 @@ func setImageCache(url string, isUrl bool, contentType string, width int, height
 	}
 	common.RedisHashSet("image_url", random.StrToMd5(url), cache, CacheSecond)
 }
-func IsImageUrl(url string) (bool, error) {
+func IsImageUrl(url string) (bool, string, error) {
 	var cache *ImageCache
 	result, err := common.RedisHashGet("image_url", random.StrToMd5(url))
 	if err == nil {
 		err = json.Unmarshal([]byte(result), &cache)
 		if err == nil {
-			return cache.IsURL, nil
+			return cache.IsURL, cache.ContentType, nil
 		}
 	}
 	resp, err := client.UserContentRequestHTTPClient.Get(url)
@@ -93,28 +94,32 @@ func IsImageUrl(url string) (bool, error) {
 		//先改为正常请求, 再次报错再进行异常抛出
 		resp, err = imageClient.Get(url)
 		if err != nil {
-			logger.SysLog(fmt.Sprintf("IsImageUrl - HTTPClient报错: %s", err.Error()))
-			return false, err
+			logger.SysLogf("IsImageUrl - HTTPClient报错: %s", err.Error())
+			return false, "", err
 		}
 	}
-	if !strings.HasPrefix(resp.Header.Get("Content-Type"), "image/") {
+	contentType := resp.Header.Get("Content-Type")
+	if !strings.HasPrefix(contentType, "image/") {
 		//读取响应体
-		_, err := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		defer resp.Body.Close()
 		if err != nil {
-			// 获取并解析Content-Type
-			// contentType := resp.Header.Get("Content-Type")
-			// mediaType, _, _ := mime.ParseMediaType(contentType)
-			logger.SysLog(fmt.Sprintf("IsImageUrl - io.ReadAll: %s", resp.Header.Get("Content-Type")))
+			logger.SysLogf("IsImageUrl - io.ReadAll: %s", contentType)
 			setImageCache(url, false, "", 0, 0, "")
-			return false, nil
+			return false, "", nil
 		}
-		logger.SysLog(fmt.Sprintf("IsImageUrl - Content-Type错误: %s", resp.Header.Get("Content-Type")))
-		setImageCache(url, false, "", 0, 0, "")
-		return false, nil
+
+		// 获取并解析Content-Type
+		detectedType := http.DetectContentType(body)
+		contentType, _, _ = mime.ParseMediaType(detectedType)
+		if !strings.HasPrefix(contentType, "image/") {
+			logger.SysLogf("IsImageUrl - Content-Type错误: %s - %s", contentType, url)
+			setImageCache(url, false, "", 0, 0, "")
+			return false, "", nil
+		}
 	}
-	setImageCache(url, true, resp.Header.Get("Content-Type"), 0, 0, "")
-	return true, nil
+	setImageCache(url, true, contentType, 0, 0, "")
+	return true, contentType, nil
 }
 
 func GetImageSizeFromUrl(url string) (width int, height int, err error) {
@@ -126,7 +131,7 @@ func GetImageSizeFromUrl(url string) (width int, height int, err error) {
 			return cache.Width, cache.Height, nil
 		}
 	}
-	isImage, err := IsImageUrl(url)
+	isImage, _, err := IsImageUrl(url)
 	if !isImage {
 		return
 	}
@@ -135,7 +140,7 @@ func GetImageSizeFromUrl(url string) (width int, height int, err error) {
 		//先改为正常请求, 再次报错再进行异常抛出
 		resp, err = imageClient.Get(url)
 		if err != nil {
-			logger.SysLog(fmt.Sprintf("HTTPClient报错: %s", err.Error()))
+			logger.SysLogf("HTTPClient报错: %s", err.Error())
 			return
 		}
 	}
@@ -187,7 +192,7 @@ func getImageFormat(input string, saveLocal bool) (string, string, error) {
 	var imageData []byte
 	imageData, err = base64.StdEncoding.DecodeString(input)
 	if err != nil {
-		logger.SysLog(fmt.Sprintf("Vision-Base64方式-DecodeString报错: %s->%s", input, err.Error()))
+		logger.SysLogf("Vision-Base64方式-DecodeString报错: %s->%s", input, err.Error())
 		return "", "", err
 	}
 
@@ -284,7 +289,7 @@ func GetImageFromUrl(url string, saveLocal bool) (mimeType string, data string, 
 		data = imgData
 		return imgType, data, nil
 	}
-	isImage, err := IsImageUrl(url)
+	isImage, contentType, err := IsImageUrl(url)
 	if !isImage && err == nil {
 		return "", "", fmt.Errorf("failed to get this url : it may not an image")
 	}
@@ -322,14 +327,13 @@ func GetImageFromUrl(url string, saveLocal bool) (mimeType string, data string, 
 	}
 	data = encodedBuilder.String()
 
-	mimeType = resp.Header.Get("Content-Type")
-	parts := strings.SplitN(mimeType, ";", 2)
+	parts := strings.SplitN(contentType, ";", 2)
 
 	if saveLocal {
 		t := strings.SplitN(parts[0], "/", 2)
 		ext := ""
 		if len(t) < 2 {
-			logger.SysLogf("GetImageFromUrl - saveLocal: split Content-Type err: %s =>%s=>%v", mimeType, parts[0], t)
+			logger.SysLogf("GetImageFromUrl - saveLocal: split Content-Type err: %s =>%s=>%v", contentType, parts[0], t)
 			ext = "unknow"
 		} else {
 			ext = t[1]
