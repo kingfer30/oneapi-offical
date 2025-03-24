@@ -106,6 +106,19 @@ func ImageStreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*
 			logger.SysError("error unmarshalling stream response: " + err.Error())
 			continue
 		}
+		if len(geminiResponse.Candidates) > 0 {
+			if geminiResponse.Candidates[0].FinishReason == "IMAGE_SAFETY" {
+				return &relaymodel.ErrorWithStatusCode{
+					Error: relaymodel.Error{
+						Message: "Unable to generate image that is an unsafe image, such as graphically violent or gruesome",
+						Type:    "request_forbidden ",
+						Param:   "",
+						Code:    403,
+					},
+					StatusCode: 403,
+				}, "", nil
+			}
+		}
 
 		//请求画图模型, 但以聊天接口访问的, 按聊天接口的格式返回
 		response, isStop := responseGemini2OpenAIChatStream(c, &geminiResponse, &content)
