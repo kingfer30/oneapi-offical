@@ -31,9 +31,17 @@ var ModelList = []string{
 	"gemini-2.0-flash-exp",
 	"gemini-2.0-flash-thinking-exp",
 	"gemini-2.0-flash-thinking-exp-01-21",
+	"gemini-2.0-flash-lite",
+	"gemini-2.0-flash-lite-001",
 	"gemini-2.0-flash-lite-preview-02-05",
 	"gemini-2.0-pro-exp-02-05",
+	"gemini-2.0-pro-exp",
 	"gemini-2.0-flash-exp-image-generation",
+	"gemma-3-27b-it",
+	"gemini-embedding-exp-03-07",
+	"gemini-embedding-exp",
+	"embedding-001",
+	"gemini-2.5-pro-exp-03-25",
 }
 
 //定义支持画图的模型
