@@ -390,10 +390,11 @@ func responseGemini2OpenAIImage(response *ChatResponse, respType string) (*Image
 
 // 异步上传文件到gemini, 这里是针对chat模型做的优化, 可以加快聊天响应速度
 func syncUploadImg2Gemini(c *gin.Context, mimeType string, filePath string, url string) {
+	newContext := c.Copy()
 	go func() {
-		_, fileData, err := FileHandler(c, url, url, mimeType, filePath)
+		_, fileData, err := FileHandler(newContext, url, url, mimeType, filePath)
 		if err != nil {
-			meta := meta.GetByContext(c)
+			meta := meta.GetByContext(newContext)
 			logger.SysErrorf("syncUploadImg2Gemini - FileHandler err: %s, api-key: %s", err.Error(), meta.APIKey)
 			return
 		}
