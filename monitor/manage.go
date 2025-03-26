@@ -60,7 +60,7 @@ func ShouldSleepChannel(c *gin.Context, err *model.Error, statusCode int) bool {
 	meta := meta.GetByContext(c)
 	lowerMessage := strings.ToLower(err.Message)
 	if strings.Contains(lowerMessage, "resource has been exhauste") ||
-		(strings.Contains(lowerMessage, "You exceeded your current quota") && meta.APIType == apitype.Gemini) ||
+		(strings.Contains(lowerMessage, "you exceeded your current quota") && meta.APIType == apitype.Gemini) ||
 		strings.Contains(lowerMessage, "e.g. check quota") {
 		return true
 	}
