@@ -74,7 +74,7 @@ func Relay(c *gin.Context) {
 	channelName := c.GetString(ctxkey.ChannelName)
 	group := c.GetString(ctxkey.Group)
 	originalModel := c.GetString(ctxkey.OriginalModel)
-	go processChannelRelayError(c, userId, channelId, channelName, bizErr)
+	go processChannelRelayError(c, userId, channelId, channelName, group, originalModel, bizErr)
 	requestId := c.GetString(helper.RequestIdKey)
 	retryTimes := config.RetryTimes
 	if !shouldRetry(c, bizErr.StatusCode) {
@@ -101,7 +101,7 @@ func Relay(c *gin.Context) {
 		lastFailedChannelId = channelId
 		channelName := c.GetString(ctxkey.ChannelName)
 		// BUG: bizErr is in race condition
-		go processChannelRelayError(c, userId, channelId, channelName, bizErr)
+		go processChannelRelayError(c, userId, channelId, channelName, group, originalModel, bizErr)
 	}
 	if bizErr != nil {
 		// if bizErr.StatusCode == http.StatusTooManyRequests {
@@ -135,12 +135,12 @@ func shouldRetry(c *gin.Context, statusCode int) bool {
 	return true
 }
 
-func processChannelRelayError(c *gin.Context, userId int, channelId int, channelName string, err *model.ErrorWithStatusCode) {
+func processChannelRelayError(c *gin.Context, userId int, channelId int, channelName string, group string, modelName string, err *model.ErrorWithStatusCode) {
 	logger.Errorf(c.Request.Context(), "relay error (channel id %d, user id: %d): %s", channelId, userId, err.Message)
 
 	if monitor.ShouldSleepChannel(c, &err.Error, err.StatusCode) {
 		awakeTime := helper.GetTimestamp() + 60
-		monitor.SleepChannel(channelId, channelName, awakeTime)
+		monitor.SleepChannel(group, modelName, channelId, awakeTime)
 	}
 	if monitor.ShouldDelFile(c, &err.Error) {
 		fileUri := c.GetString("FileUri")

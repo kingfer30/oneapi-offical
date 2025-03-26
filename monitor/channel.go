@@ -34,12 +34,11 @@ func syncUpdateChannel() {
 		model.InitChannelCache()
 	}()
 }
-
-// DisableChannel disable & notify
-func SleepChannel(channelId int, channelName string, awakeTime int64) {
-	model.SleepChannel(channelId, awakeTime)
-	//异步执行更新
-	syncUpdateChannel()
+func SleepChannel(group string, modelName string, channelId int, awakeTime int64) {
+	model.SleepChannel(group, modelName, channelId, awakeTime)
+}
+func WakeupChannel(frequency int) {
+	model.WakeupChannel(frequency)
 }
 
 // DisableChannel disable & notify
@@ -69,24 +68,6 @@ func EnableChannel(channelId int, channelName string) {
 	subject := fmt.Sprintf("渠道「%s」（#%d）已被启用", channelName, channelId)
 	content := fmt.Sprintf("渠道「%s」（#%d）已被启用", channelName, channelId)
 	notifyRootUser(subject, content)
-}
-
-// 渠道唤醒
-func WakeupChannel(frequency int) {
-	for {
-		logger.SysLog("begining wakeup channel")
-		ids, err := model.WakeupChannel()
-		if err != nil {
-			logger.SysError(fmt.Sprintf("SyncWakeupChannel error: %s", err.Error()))
-			continue
-		}
-
-		if len(ids) > 0 {
-			logger.SysLog(fmt.Sprintf("已唤醒休眠渠道: %d 个", len(ids)))
-		}
-		logger.SysLog("wakeup channel end")
-		time.Sleep(time.Duration(frequency) * time.Second)
-	}
 }
 
 func DelFile(channelId int, fileId string) {

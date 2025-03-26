@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
@@ -46,6 +47,9 @@ type Channel struct {
 	RpmLimit           int     `json:"rpm_limit" gorm:"default:0"`
 	DpmLimit           int     `json:"dpm_limit" gorm:"default:0"`
 	TpmLimit           int     `json:"tpm_limit" gorm:"default:0"`
+	// 新增字段，记录被禁用的模型
+	SleepModels map[string]int64 `gorm:"-"` // 标记为忽略数据库
+	SleepLock   sync.RWMutex     `gorm:"-"` // 锁也不需要持久化
 }
 
 type ChannelConfig struct {
@@ -204,29 +208,6 @@ func UpdateChannelStatusById(id int, status int) {
 	if err != nil {
 		logger.SysError("failed to update channel status: " + err.Error())
 	}
-}
-
-func SleepChannel(id int, awakeTime int64) (bool, error) {
-	err := DB.Model(&Channel{}).Where("id = ?", id).Updates(Channel{
-		Status:    ChannelStatusSleeping,
-		AwakeTime: awakeTime,
-	}).Error
-	if err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
-func WakeupChannel() ([]int, error) {
-	var channelIDs []int
-	err := DB.Model(&Channel{}).Where("status = ? and awake_time <= ?", ChannelStatusSleeping, helper.GetTimestamp()).Pluck("id", &channelIDs).Error
-	if err != nil {
-		logger.SysError(fmt.Sprintf("WakeupChannel faild: %s ", err.Error()))
-	}
-	result := DB.Model(&Channel{}).Where("id IN ?", channelIDs).Updates(Channel{
-		Status: ChannelStatusEnabled,
-	})
-	return channelIDs, result.Error
 }
 
 func UpdateChannelUsedQuota(id int, quota int64) {

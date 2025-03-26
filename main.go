@@ -98,7 +98,13 @@ func main() {
 	if os.Getenv("AUTO_ACTIVATE_CHANNEL") == "true" {
 		go monitor.AutoActivate(10)
 	}
-	go monitor.WakeupChannel(config.SyncFrequency)
+	if os.Getenv("SYNC_CHANNEL_WAKEUP") != "" {
+		frequency, err := strconv.Atoi(os.Getenv("SYNC_CHANNEL_WAKEUP"))
+		if err != nil {
+			logger.FatalLog("failed to parse SYNC_CHANNEL_WAKEUP: " + err.Error())
+		}
+		go monitor.WakeupChannel(frequency)
+	}
 	go monitor.AutoDelFile(config.SyncFrequency)
 	openai.InitTokenEncoders()
 	client.Init()

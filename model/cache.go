@@ -14,6 +14,7 @@ import (
 
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
+	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/random"
 )
@@ -180,11 +181,10 @@ func InitChannelCache() {
 	}
 }
 func InitChannelCacheByMem() {
-	newChannelId2channel := make(map[int]*Channel)
 	var channels []*Channel
 	DB.Where("status = ?", ChannelStatusEnabled).Find(&channels)
 	for _, channel := range channels {
-		newChannelId2channel[channel.Id] = channel
+		channel.SleepModels = make(map[string]int64)
 	}
 	var abilities []*Ability
 	DB.Find(&abilities)
@@ -265,11 +265,27 @@ func CacheGetRandomSatisfiedChannel(group string, model string, ignoreFirstPrior
 		return nil, errors.New("channel not found")
 	}
 	endIdx := len(channels)
+
+	// 过滤掉被禁用当前模型的渠道
+	var validChannels []*Channel
+	for _, ch := range channels {
+		ch.SleepLock.RLock()
+		wakeupAt := ch.SleepModels[model]
+		ch.SleepLock.RUnlock()
+		if wakeupAt == 0 {
+			validChannels = append(validChannels, ch)
+		}
+	}
+
+	if len(validChannels) == 0 {
+		return nil, errors.New("channel not found")
+	}
+
 	// choose by priority
-	firstChannel := channels[0]
+	firstChannel := validChannels[0]
 	if firstChannel.GetPriority() > 0 {
-		for i := range channels {
-			if channels[i].GetPriority() != firstChannel.GetPriority() {
+		for i := range validChannels {
+			if validChannels[i].GetPriority() != firstChannel.GetPriority() {
 				endIdx = i
 				break
 			}
@@ -277,9 +293,71 @@ func CacheGetRandomSatisfiedChannel(group string, model string, ignoreFirstPrior
 	}
 	idx := rand.Intn(endIdx)
 	if ignoreFirstPriority {
-		if endIdx < len(channels) { // which means there are more than one priority
-			idx = random.RandRange(endIdx, len(channels))
+		if endIdx < len(validChannels) { // which means there are more than one priority
+			idx = random.RandRange(endIdx, len(validChannels))
 		}
 	}
-	return channels[idx], nil
+	return validChannels[idx], nil
+}
+
+// 新版锁定模型
+func SleepChannel(group string, model string, channelId int, awakeTime int64) {
+	channelSyncLock.RLock()
+	defer channelSyncLock.RUnlock()
+	channels := group2model2channels[group][model]
+	for _, channel := range channels {
+		if channel.Id == channelId {
+			channel.SleepLock.Lock()
+			channel.SleepModels[model] = awakeTime
+			channel.SleepLock.Unlock()
+			logger.SysLogf("渠道 - [%s(%d)] , model - [%s] 已休眠至 %d", channel.Name, channel.Id, model, awakeTime)
+			break
+		}
+	}
+}
+
+// 渠道唤醒
+func WakeupChannel(frequency int) {
+	for {
+		logger.SysLog("begining wakeup channel")
+		var tasks []struct {
+			channel *Channel
+			model   string
+		}
+		func() {
+			channelSyncLock.RLock()
+			defer channelSyncLock.RUnlock()
+			for _, models := range group2model2channels {
+			mLoop:
+				for model, channels := range models {
+					for _, channel := range channels {
+						if len(channel.SleepModels) > 0 {
+							for sm, awakeTime := range channel.SleepModels {
+								if sm == model && awakeTime <= helper.GetTimestamp() {
+									tasks = append(tasks, struct {
+										channel *Channel
+										model   string
+									}{
+										channel: channel,
+										model:   model,
+									})
+								}
+							}
+							continue mLoop
+						}
+					}
+				}
+			}
+		}()
+		channelSyncLock.Lock()
+		for _, task := range tasks {
+			task.channel.SleepLock.Lock()
+			delete(task.channel.SleepModels, task.model)
+			task.channel.SleepLock.Unlock()
+			logger.SysLogf("渠道 - [%s(%d)] , model - [%s] 已唤醒", task.channel.Name, task.channel.Id, task.model)
+		}
+		channelSyncLock.Unlock()
+		logger.SysLog("wakeup channel end")
+		time.Sleep(time.Duration(frequency) * time.Second)
+	}
 }
