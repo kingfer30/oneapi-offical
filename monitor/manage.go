@@ -6,6 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common/config"
+	"github.com/songquanpeng/one-api/relay/apitype"
+	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
 )
 
@@ -55,11 +57,10 @@ func ShouldDelFile(c *gin.Context, err *model.Error) bool {
 }
 
 func ShouldSleepChannel(c *gin.Context, err *model.Error, statusCode int) bool {
-	// if channelType != apitype.Gemini {
-	// 	return false
-	// }
+	meta := meta.GetByContext(c)
 	lowerMessage := strings.ToLower(err.Message)
 	if strings.Contains(lowerMessage, "resource has been exhauste") ||
+		(strings.Contains(lowerMessage, "You exceeded your current quota") && meta.APIType == apitype.Gemini) ||
 		strings.Contains(lowerMessage, "e.g. check quota") {
 		return true
 	}
