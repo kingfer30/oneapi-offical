@@ -264,7 +264,6 @@ func CacheGetRandomSatisfiedChannel(group string, model string, ignoreFirstPrior
 	if len(channels) == 0 {
 		return nil, errors.New("channel not found")
 	}
-	endIdx := len(channels)
 
 	// 过滤掉被禁用当前模型的渠道
 	var validChannels []*Channel
@@ -280,6 +279,8 @@ func CacheGetRandomSatisfiedChannel(group string, model string, ignoreFirstPrior
 	if len(validChannels) == 0 {
 		return nil, errors.New("channel not found")
 	}
+
+	endIdx := len(validChannels)
 
 	// choose by priority
 	firstChannel := validChannels[0]
