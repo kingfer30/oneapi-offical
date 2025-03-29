@@ -75,7 +75,7 @@ func Relay(c *gin.Context) {
 	channelType := c.GetInt(ctxkey.Channel)
 	group := c.GetString(ctxkey.Group)
 	originalModel := c.GetString(ctxkey.OriginalModel)
-	go processChannelRelayError(c, userId, channelId, channelName, group, originalModel,channelType,bizErr)
+	go processChannelRelayError(c, userId, channelId, channelName, group, originalModel, channelType, bizErr)
 	requestId := c.GetString(helper.RequestIdKey)
 	retryTimes := config.RetryTimes
 	if !shouldRetry(c, bizErr.StatusCode) {
@@ -140,7 +140,15 @@ func processChannelRelayError(c *gin.Context, userId int, channelId int, channel
 	logger.Errorf(c.Request.Context(), "relay error (channel id %d, user id: %d): %s", channelId, userId, err.Message)
 
 	if monitor.ShouldSleepChannel(channelType, &err.Error, err.StatusCode) {
-		awakeTime := helper.GetTimestamp() + 60
+		var awakeTime int64
+		//gemini的重试
+		delay := c.GetInt("gemini_delay")
+		if delay > 0 {
+			awakeTime = helper.GetTimestamp() + int64(delay)
+		}
+		if awakeTime == 0 {
+			awakeTime = helper.GetTimestamp() + 60
+		}
 		monitor.SleepChannel(group, modelName, channelId, awakeTime)
 	}
 	if monitor.ShouldDelFile(c, &err.Error) {

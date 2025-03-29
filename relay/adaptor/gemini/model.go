@@ -31,9 +31,19 @@ type EmbeddingResponse struct {
 }
 
 type Error struct {
-	Code    int    `json:"code,omitempty"`
-	Message string `json:"message,omitempty"`
-	Status  string `json:"status,omitempty"`
+	Code    int           `json:"code,omitempty"`
+	Message string        `json:"message,omitempty"`
+	Status  string        `json:"status,omitempty"`
+	Details []ErrorDetail `json:"details,omitempty"`
+}
+
+type ErrorDetail struct {
+	Type       string `json:"@type,omitempty"`
+	RetryDelay string `json:"retryDelay,omitempty"`
+}
+
+type GeminiErrorResponse struct {
+	Error *Error `json:"error,omitempty"`
 }
 
 type InlineData struct {

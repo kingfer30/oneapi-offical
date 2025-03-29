@@ -138,6 +138,12 @@ func String2Int(str string) int {
 	}
 	return num
 }
+func EncryptKey(key string) string {
+	firstThree := key[0:3]
+	lastSix := key[len(key)-6:]
+	hiddenMiddle := "****"
+	return fmt.Sprintf("sk-%s%s%s", firstThree, hiddenMiddle, lastSix)
+}
 
 func Float64PtrMax(p *float64, maxValue float64) *float64 {
 	if p == nil {

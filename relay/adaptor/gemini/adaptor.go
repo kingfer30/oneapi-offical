@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common/config"
@@ -133,6 +135,42 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 	resp, err := doRequest(c, req)
 	if err != nil {
 		return nil, fmt.Errorf("do request failed: %w", err)
+	}
+	if resp.StatusCode == http.StatusTooManyRequests {
+		//429的问题处理
+		defer resp.Body.Close()
+		requestBody, err := io.ReadAll(resp.Body)
+		if err == nil {
+			var geminiErr *GeminiErrorResponse
+			err = json.Unmarshal(requestBody, &geminiErr)
+			if err == nil {
+				if len(geminiErr.Error.Details) > 0 {
+					delay := 60
+					re := regexp.MustCompile(`\d+`)
+					for _, detail := range geminiErr.Error.Details {
+						if detail.RetryDelay != "" {
+							num := re.FindString(detail.RetryDelay)
+							delay, _ = strconv.Atoi(num)
+							break
+						}
+					}
+					openaiErr := openai.ErrorWrapper(
+						fmt.Errorf("Guo - Resource has been exhausted"),
+						"too_many_requests",
+						http.StatusTooManyRequests,
+					)
+					errData, err := json.Marshal(openaiErr)
+					if err == nil {
+						resp.Body = io.NopCloser(bytes.NewBuffer(errData))
+					} else {
+						resp.Body = io.NopCloser(bytes.NewBuffer(requestBody))
+					}
+					c.Set("gemini_delay", delay)
+				}
+			} else {
+				resp.Body = io.NopCloser(bytes.NewBuffer(requestBody))
+			}
+		}
 	}
 	return resp, nil
 }
