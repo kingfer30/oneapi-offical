@@ -388,10 +388,17 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relay
 		}
 
 		responseText += response.Choices[0].Delta.StringContent()
+		prompt, completion, quota := ResetChatQuota(
+			geminiResponse.UsageMetadata.PromptTokenCount,
+			geminiResponse.UsageMetadata.CandidatesTokenCount,
+			geminiResponse.UsageMetadata.TotalTokenCount,
+			true,
+			meta,
+		)
 		usage = &relaymodel.Usage{
-			PromptTokens:     geminiResponse.UsageMetadata.PromptTokenCount,
-			CompletionTokens: geminiResponse.UsageMetadata.CandidatesTokenCount,
-			TotalTokens:      geminiResponse.UsageMetadata.TotalTokenCount,
+			PromptTokens:     prompt,
+			CompletionTokens: completion,
+			TotalTokens:      quota,
 		}
 		response.Usage = usage
 
@@ -444,10 +451,17 @@ func Handler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relaymodel.
 	fullTextResponse.Model = meta.ActualModelName
 	var usage relaymodel.Usage
 	if geminiResponse.UsageMetadata != nil {
+		prompt, completion, quota := ResetChatQuota(
+			geminiResponse.UsageMetadata.PromptTokenCount,
+			geminiResponse.UsageMetadata.CandidatesTokenCount,
+			geminiResponse.UsageMetadata.TotalTokenCount,
+			false,
+			meta,
+		)
 		usage = relaymodel.Usage{
-			PromptTokens:     geminiResponse.UsageMetadata.PromptTokenCount,
-			CompletionTokens: geminiResponse.UsageMetadata.CandidatesTokenCount,
-			TotalTokens:      geminiResponse.UsageMetadata.TotalTokenCount,
+			PromptTokens:     prompt,
+			CompletionTokens: completion,
+			TotalTokens:      quota,
 		}
 	} else {
 		completionTokens := openai.CountTokenText(geminiResponse.GetResponseText(meta), meta.ActualModelName)
