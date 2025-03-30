@@ -45,8 +45,8 @@ func DelFileByChannelId(channelId int) (err error) {
 }
 
 // 删除key对应的某个文件
-func DelFileByFileId(channelId int, fileId string) (err error) {
-	result := DB.Where("channel_id = ? and file_id = ?", channelId, fileId).Delete(&Files{})
+func DelFileByFileId(fileId string) (err error) {
+	result := DB.Where("file_id = ?", fileId).Delete(&Files{})
 	if result.Error != nil {
 		return result.Error
 	}

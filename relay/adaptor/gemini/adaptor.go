@@ -149,7 +149,7 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 			if err == nil && (strings.Contains(geminiErr.Error.Message, "File ") && strings.Contains(geminiErr.Error.Message, "not exist in the Gemini API.")) {
 				re := regexp.MustCompile(`https?://[^\s]+`)
 				url := re.FindString(geminiErr.Error.Message)
-				dbmodel.DelFileByFileId(meta.ChannelId, url)
+				dbmodel.DelFileByFileId(url)
 				openaiErr := openai.ErrorWrapper(
 					fmt.Errorf("File not exist"),
 					"bad_requests",

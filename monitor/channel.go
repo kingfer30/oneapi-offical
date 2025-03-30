@@ -71,7 +71,7 @@ func EnableChannel(channelId int, channelName string) {
 }
 
 func DelFile(channelId int, fileId string) {
-	err := model.DelFileByFileId(channelId, fileId)
+	err := model.DelFileByChannelId(channelId)
 	if err != nil {
 		logger.SysLogf("DelFileByFileId failed: %s", err.Error())
 	}
