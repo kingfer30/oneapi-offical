@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
+	"math"
 	"net/http"
 	"runtime"
 	"strings"
@@ -241,6 +243,7 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 
 	modelRatio := billingratio.GetModelRatio(imageModel, meta.ChannelType, meta.Group)
 	groupRatio := billingratio.GetGroupRatio(meta.Group)
+	completionRatio := billingratio.GetCompletionRatio(imageModel, meta.ChannelType)
 	ratio := modelRatio * groupRatio
 	userQuota, _ := model.CacheGetUserQuota(ctx, meta.UserId)
 
@@ -282,9 +285,13 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		prompt := 0
 		completion := 0
 		if usage != nil && usage.TotalTokens > int(quota) {
-			quota = int64(usage.TotalTokens)
 			prompt = usage.PromptTokens
 			completion = usage.CompletionTokens
+			quota = int64(math.Ceil((float64(prompt) + float64(completion)*completionRatio) * ratio))
+			log.Printf("quota:%d", quota)
+			if usage.TotalTokens > int(quota) {
+				quota = int64(usage.TotalTokens)
+			}
 		}
 		err := model.PostConsumeTokenQuota(meta.TokenId, quota)
 		if err != nil {

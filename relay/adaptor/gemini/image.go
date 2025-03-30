@@ -92,6 +92,7 @@ func ImageStreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*
 
 	common.SetEventStreamHeaders(c)
 	var content []ImageResponse2ChatContent
+	imgNum := 0
 	for scanner.Scan() {
 		data := scanner.Text()
 		data = strings.TrimSpace(data)
@@ -100,6 +101,7 @@ func ImageStreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*
 		}
 		data = strings.TrimPrefix(data, "data: ")
 		data = strings.TrimSuffix(data, "\"")
+
 		var geminiResponse ChatResponse
 		err := json.Unmarshal([]byte(data), &geminiResponse)
 		if err != nil {
@@ -121,17 +123,25 @@ func ImageStreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*
 		}
 
 		//请求画图模型, 但以聊天接口访问的, 按聊天接口的格式返回
-		response, isStop := responseGemini2OpenAIChatStream(c, &geminiResponse, &content)
+		response, isStop, num := responseGemini2OpenAIChatStream(c, &geminiResponse, &content)
+		imgNum += num
 		if response == nil {
 			logger.SysErrorf("error responseGemini2OpenAIChat: response is empty ->%s ", data)
 			continue
 		}
 		response.Model = meta.ActualModelName
 		responseText += response.Choices[0].Delta.StringContent()
+		prompt, completion, quota := ResetChatQuota(
+			geminiResponse.UsageMetadata.PromptTokenCount,
+			geminiResponse.UsageMetadata.CandidatesTokenCount,
+			geminiResponse.UsageMetadata.TotalTokenCount,
+			imgNum,
+			meta,
+		)
 		usage = &relaymodel.Usage{
-			PromptTokens:     geminiResponse.UsageMetadata.PromptTokenCount,
-			CompletionTokens: geminiResponse.UsageMetadata.CandidatesTokenCount,
-			TotalTokens:      geminiResponse.UsageMetadata.TotalTokenCount,
+			PromptTokens:     prompt,
+			CompletionTokens: completion,
+			TotalTokens:      quota,
 		}
 		response.Usage = usage
 
@@ -163,7 +173,7 @@ func ImageStreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*
 	return nil, responseText, usage
 }
 
-func responseGemini2OpenAIChatStream(c *gin.Context, geminiResponse *ChatResponse, promptContent *[]ImageResponse2ChatContent) (*openai.ChatCompletionsStreamResponse, bool) {
+func responseGemini2OpenAIChatStream(c *gin.Context, geminiResponse *ChatResponse, promptContent *[]ImageResponse2ChatContent) (*openai.ChatCompletionsStreamResponse, bool, int) {
 	var choice openai.ChatCompletionsStreamResponseChoice
 	var response openai.ChatCompletionsStreamResponse
 	response.Id = fmt.Sprintf("chatcmpl-%s", random.GetUUID())
@@ -171,6 +181,7 @@ func responseGemini2OpenAIChatStream(c *gin.Context, geminiResponse *ChatRespons
 	response.Object = "chat.completion.chunk"
 	text := ""
 	isStop := false
+	imgNum := 0
 	if len(geminiResponse.Candidates) > 0 {
 		for i, candidate := range geminiResponse.Candidates {
 			if candidate.FinishReason != "" {
@@ -182,6 +193,7 @@ func responseGemini2OpenAIChatStream(c *gin.Context, geminiResponse *ChatRespons
 			if len(candidate.Content.Parts) > 0 {
 				for _, item := range candidate.Content.Parts {
 					if item.InlineData != nil {
+						imgNum++
 						// 这里是chat聊天模型, 直接将返回的b64转url, 不返回b64格式
 						//url格式需要上传图床
 						url, fileName, err := image.StreamUploadByB64(item.InlineData.Data, item.InlineData.MimeType)
@@ -213,7 +225,7 @@ func responseGemini2OpenAIChatStream(c *gin.Context, geminiResponse *ChatRespons
 	}
 	choice.Delta.Content = text
 	response.Choices = []openai.ChatCompletionsStreamResponseChoice{choice}
-	return &response, isStop
+	return &response, isStop, imgNum
 }
 
 func ImageHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model.ErrorWithStatusCode, *model.Usage) {
@@ -245,17 +257,22 @@ func ImageHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model.
 	}
 
 	var usage relaymodel.Usage
-	if geminiResponse.UsageMetadata != nil {
-		usage = relaymodel.Usage{
-			PromptTokens:     geminiResponse.UsageMetadata.PromptTokenCount,
-			CompletionTokens: geminiResponse.UsageMetadata.CandidatesTokenCount,
-			TotalTokens:      geminiResponse.UsageMetadata.TotalTokenCount,
-		}
-	}
 	var jsonResponse []byte
 	if meta.Image2Chat {
 		//请求画图模型, 以chat接口访问的, 按chat接口的格式返回
-		fullResponse := responseGemini2OpenAIChat(c, &geminiResponse)
+		fullResponse, imgN := responseGemini2OpenAIChat(c, &geminiResponse)
+		prompt, completion, quota := ResetChatQuota(
+			geminiResponse.UsageMetadata.PromptTokenCount,
+			geminiResponse.UsageMetadata.CandidatesTokenCount,
+			geminiResponse.UsageMetadata.TotalTokenCount,
+			imgN,
+			meta,
+		)
+		usage = relaymodel.Usage{
+			PromptTokens:     prompt,
+			CompletionTokens: completion,
+			TotalTokens:      quota,
+		}
 		fullResponse.Usage = usage
 		jsonResponse, err = json.Marshal(fullResponse)
 		if err != nil {
@@ -266,6 +283,11 @@ func ImageHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model.
 		fullResponse, jerr := responseGemini2OpenAIImage(&geminiResponse, responseFormat)
 		if jerr != nil {
 			return jerr, nil
+		}
+		usage = relaymodel.Usage{
+			PromptTokens:     geminiResponse.UsageMetadata.PromptTokenCount,
+			CompletionTokens: geminiResponse.UsageMetadata.CandidatesTokenCount,
+			TotalTokens:      geminiResponse.UsageMetadata.TotalTokenCount,
 		}
 		fullResponse.Usage = usage
 		jsonResponse, err = json.Marshal(fullResponse)
@@ -280,7 +302,7 @@ func ImageHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model.
 	return nil, &usage
 }
 
-func responseGemini2OpenAIChat(c *gin.Context, response *ChatResponse) *openai.TextResponse {
+func responseGemini2OpenAIChat(c *gin.Context, response *ChatResponse) (*openai.TextResponse, int) {
 	fullTextResponse := openai.TextResponse{
 		Id:      fmt.Sprintf("chatcmpl-%s", random.GetUUID()),
 		Object:  "chat.completion",
@@ -290,6 +312,7 @@ func responseGemini2OpenAIChat(c *gin.Context, response *ChatResponse) *openai.T
 	var prompt = ImageResponse2Chat{
 		Role: "assistant",
 	}
+	imgNum := 0
 	var promptContent []ImageResponse2ChatContent
 	for i, candidate := range response.Candidates {
 		choice := openai.TextResponseChoice{
@@ -307,6 +330,7 @@ func responseGemini2OpenAIChat(c *gin.Context, response *ChatResponse) *openai.T
 				for i, item := range candidate.Content.Parts {
 					content := ""
 					if item.InlineData != nil {
+						imgNum++
 						// 这里是chat聊天模型, 直接将返回的b64转url, 不返回b64格式
 						//url格式需要上传图床
 						url, fileName, err := image.StreamUploadByB64(item.InlineData.Data, item.InlineData.MimeType)
@@ -347,7 +371,7 @@ func responseGemini2OpenAIChat(c *gin.Context, response *ChatResponse) *openai.T
 	}
 	prompt.Content = promptContent
 	fullTextResponse.SystemPrompt = prompt
-	return &fullTextResponse
+	return &fullTextResponse, imgNum
 }
 
 func responseGemini2OpenAIImage(response *ChatResponse, respType string) (*ImageResponse, *relaymodel.ErrorWithStatusCode) {
