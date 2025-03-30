@@ -10,11 +10,13 @@ import (
 	"net/url"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/logger"
+	dbmodel "github.com/songquanpeng/one-api/model"
 	channelhelper "github.com/songquanpeng/one-api/relay/adaptor"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/meta"
@@ -136,6 +138,34 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 	if err != nil {
 		return nil, fmt.Errorf("do request failed: %w", err)
 	}
+
+	if resp.StatusCode == http.StatusBadRequest && c.GetBool("file_upload") {
+		//400 file文件不存在的问题处理
+		defer resp.Body.Close()
+		requestBody, err := io.ReadAll(resp.Body)
+		if err == nil {
+			var geminiErr *GeminiErrorResponse
+			err = json.Unmarshal(requestBody, &geminiErr)
+			if err == nil && (strings.Contains(geminiErr.Error.Message, "File ") && strings.Contains(geminiErr.Error.Message, "not exist in the Gemini API.")) {
+				re := regexp.MustCompile(`https?://[^\s]+`)
+				url := re.FindString(geminiErr.Error.Message)
+				dbmodel.DelFileByFileId(meta.ChannelId, url)
+				openaiErr := openai.ErrorWrapper(
+					fmt.Errorf("File not exist"),
+					"bad_requests",
+					http.StatusBadRequest,
+				)
+				errData, err := json.Marshal(openaiErr)
+				if err == nil {
+					resp.Body = io.NopCloser(bytes.NewBuffer(errData))
+				} else {
+					resp.Body = io.NopCloser(bytes.NewBuffer(requestBody))
+				}
+			} else {
+				resp.Body = io.NopCloser(bytes.NewBuffer(requestBody))
+			}
+		}
+	}
 	if resp.StatusCode == http.StatusTooManyRequests {
 		//429的问题处理
 		defer resp.Body.Close()
@@ -143,30 +173,28 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 		if err == nil {
 			var geminiErr *GeminiErrorResponse
 			err = json.Unmarshal(requestBody, &geminiErr)
-			if err == nil {
-				if len(geminiErr.Error.Details) > 0 {
-					delay := 60
-					re := regexp.MustCompile(`\d+`)
-					for _, detail := range geminiErr.Error.Details {
-						if detail.RetryDelay != "" {
-							num := re.FindString(detail.RetryDelay)
-							delay, _ = strconv.Atoi(num)
-							break
-						}
+			if err == nil && len(geminiErr.Error.Details) > 0 {
+				delay := 60
+				re := regexp.MustCompile(`\d+`)
+				for _, detail := range geminiErr.Error.Details {
+					if detail.RetryDelay != "" {
+						num := re.FindString(detail.RetryDelay)
+						delay, _ = strconv.Atoi(num)
+						break
 					}
-					openaiErr := openai.ErrorWrapper(
-						fmt.Errorf("Guo - Resource has been exhausted"),
-						"too_many_requests",
-						http.StatusTooManyRequests,
-					)
-					errData, err := json.Marshal(openaiErr)
-					if err == nil {
-						resp.Body = io.NopCloser(bytes.NewBuffer(errData))
-					} else {
-						resp.Body = io.NopCloser(bytes.NewBuffer(requestBody))
-					}
-					c.Set("gemini_delay", delay)
 				}
+				openaiErr := openai.ErrorWrapper(
+					fmt.Errorf("Guo - Resource has been exhausted"),
+					"too_many_requests",
+					http.StatusTooManyRequests,
+				)
+				errData, err := json.Marshal(openaiErr)
+				if err == nil {
+					resp.Body = io.NopCloser(bytes.NewBuffer(errData))
+				} else {
+					resp.Body = io.NopCloser(bytes.NewBuffer(requestBody))
+				}
+				c.Set("gemini_delay", delay)
 			} else {
 				resp.Body = io.NopCloser(bytes.NewBuffer(requestBody))
 			}

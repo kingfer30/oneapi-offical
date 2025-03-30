@@ -155,6 +155,9 @@ func SaveMediaByUrl(url string) (error, string, string) {
 	if contentType == "audio/mpeg" {
 		contentType = "audio/mp3"
 	}
+	if contentType == "audio/x-wav" {
+		contentType = "audio/wav"
+	}
 
 	// 创建临时文件
 	// 判断文件夹是否存在

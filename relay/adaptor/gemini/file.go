@@ -35,6 +35,7 @@ func FileHandler(c *gin.Context, fieldUrl string, url string, contentType string
 			meta.APIKey = fileOld.Key
 			c.Set("x-new-api-key", fileOld.Key)
 			c.Set("FileUri", fileOld.FileId)
+			c.Set("file_upload", true)
 			return fileOld.ContentType, fileOld.FileId, nil
 		}
 	}
@@ -105,6 +106,7 @@ func FileHandler(c *gin.Context, fieldUrl string, url string, contentType string
 	}
 	logger.SysLogf("[Upload File] API Key: %s | Url: %s | FileId: %d", currentKey, file.URI, fileId)
 	c.Set("FileUri", file.URI)
+	c.Set("file_upload", true)
 
 	return contentType, file.URI, nil
 }
