@@ -11,19 +11,21 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
+	"github.com/songquanpeng/one-api/common/image"
 	"github.com/songquanpeng/one-api/common/logger"
+	"github.com/songquanpeng/one-api/common/random"
 	dbmodel "github.com/songquanpeng/one-api/model"
 	channelhelper "github.com/songquanpeng/one-api/relay/adaptor"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
 	"github.com/songquanpeng/one-api/relay/relaymode"
-
-	commonClient "github.com/songquanpeng/one-api/common/client"
 )
 
 type Adaptor struct {
@@ -196,6 +198,31 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 				}
 				c.Set("gemini_delay", delay)
 			} else {
+				if c.GetString("gemini-img-url") != "" {
+					//图片生成, 且报错429, 尝试改为file模式
+					imgUrl := c.GetString("gemini-img-url")
+					fieldUrl := ""
+					if strings.HasPrefix(imgUrl, "http") || strings.HasPrefix(imgUrl, "https") {
+						fieldUrl = imgUrl
+					} else {
+						fieldUrl = random.StrToMd5(imgUrl)
+					}
+					common.RedisHashDel("image_url", random.StrToMd5(imgUrl))
+					mimeType, fileName, err := image.GetImageFromUrl(imgUrl, true)
+					if err == nil {
+						_, fileData, err := FileHandler(c, fieldUrl, imgUrl, mimeType, fileName)
+						if err == nil {
+							image.UpdateImageCacheWithGeminiFile(imgUrl, fileData)
+							logger.SysLogf("图片-429尝试生成Gemini-File - 成功: %s", fileData)
+						}
+					} else {
+						logger.SysLogf("图片-429尝试生成Gemini-File - 错误: %s", err)
+					}
+				} else if !meta.IsImageModel {
+					//非图片模型, 报429的, 尝试使用官方的
+					logger.SysLog("chat 429 尝试转官方lib中...")
+					meta.SelfImplement = true
+				}
 				resp.Body = io.NopCloser(bytes.NewBuffer(requestBody))
 			}
 		}
@@ -205,13 +232,18 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 func doRequest(c *gin.Context, req *http.Request) (*http.Response, error) {
 	var client *http.Client
 	if config.HttpProxy == "" {
-		client = commonClient.HTTPClient
+		var transport http.RoundTripper
+		client = &http.Client{
+			Timeout:   time.Duration(config.RelayGeminiTimeout) * time.Second,
+			Transport: transport,
+		}
 	} else {
 		url, err := url.Parse(config.HttpProxy)
 		if err != nil {
 			return nil, fmt.Errorf("url.Parse failed: %w", err)
 		}
 		client = &http.Client{
+			Timeout: time.Duration(config.RelayGeminiTimeout) * time.Second,
 			Transport: &http.Transport{
 				Proxy: http.ProxyURL(url),
 			},
@@ -268,6 +300,7 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 			}
 		}
 	} else {
+		logger.SysLog("开始使用官方lib请求>>>>>>")
 		var responseText string
 		usage, responseText, err = DoChatByGenai(c, meta)
 		if err == nil {

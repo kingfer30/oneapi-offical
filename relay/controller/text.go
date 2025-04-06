@@ -68,6 +68,9 @@ func RelayTextHelper(c *gin.Context) *model.ErrorWithStatusCode {
 	// no need to convert request for self-implement
 	var resp *http.Response
 	if !meta.SelfImplement || meta.Mode == relaymode.Embeddings {
+		if meta.APIType == apitype.Gemini {
+			meta.TextRequest = textRequest
+		}
 		// get request body
 		requestBody, err := getRequestBody(c, meta, textRequest, adaptor)
 		if err != nil {
@@ -80,7 +83,7 @@ func RelayTextHelper(c *gin.Context) *model.ErrorWithStatusCode {
 			logger.Errorf(ctx, "DoRequest failed: %s", err.Error())
 			return openai.ErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
 		}
-		if isErrorHappened(meta, resp) {
+		if !meta.SelfImplement && isErrorHappened(meta, resp) {
 			billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, meta.TokenId)
 			return RelayErrorHandler(resp)
 		}

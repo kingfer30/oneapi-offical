@@ -126,6 +126,9 @@ var GeminiImgUploadDomain = os.Getenv("GEMINI_IMG_UPLOAD_DOMAIN")
 
 var RelayTimeout = env.Int("RELAY_TIMEOUT", 0) // unit is second
 
+var RelayGeminiTimeout = env.Int("RELAY_GEMINI_TIMEOUT", 0) // unit is second
+var RelayIPv4Proxy = os.Getenv("RELAY_IPV4_PROXY")          // unit is second
+
 var GeminiSafetySetting = env.String("GEMINI_SAFETY_SETTING", "BLOCK_NONE")
 
 var Theme = env.String("THEME", "default")

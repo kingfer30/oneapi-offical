@@ -132,8 +132,12 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 					})
 				} else {
 					// 这里图片统一转为File, 因为base64经常报错
-					// 一种后台统一开启, 一种是chat对话中使用了画图模型, 系统类型的也强制开启, 用户的不管
-					if config.GeminiUploadImageEnabled || (IsImageModel(textRequest.Model) && content.Role != "user") {
+					// 以下的情形会强制开启图片上传gemini:
+					// 1. 后台统一开启,
+					// 2. chat对话中使用了画图模型, 对话角色=系统的也强制开启, 用户的不管
+					// 3. 用户图片的, 但是第一次请求报错429的, 会改为这种
+					if config.GeminiUploadImageEnabled || (IsImageModel(textRequest.Model) && content.Role != "user") ||
+						(image.GetImageCacheWithGeminiFile(part.ImageURL.Url) != "") {
 						fileName := ""
 						fieldUrl := ""
 						if strings.HasPrefix(part.ImageURL.Url, "http") || strings.HasPrefix(part.ImageURL.Url, "https") {
@@ -165,6 +169,8 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 						if err != nil {
 							return nil, err
 						}
+						//这里走原始的图片逻辑, 是取b64传给gemini, 保存起来是用于有些prompt请求一直会429, 外层判断429后会改为上面那种方式
+						c.Set("gemini-img-url", part.ImageURL.Url)
 						parts = append(parts, Part{
 							InlineData: &InlineData{
 								MimeType: mimeType,

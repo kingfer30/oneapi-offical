@@ -33,14 +33,8 @@ import (
 
 var CacheSecond int64 = 600
 
-var imageClient *http.Client
-
 func init() {
-	customTransport := http.DefaultTransport.(*http.Transport).Clone()
-	customTransport.Proxy = nil
-	imageClient = &http.Client{
-		Transport: customTransport,
-	}
+
 }
 
 type ImageCache struct {
@@ -49,8 +43,40 @@ type ImageCache struct {
 	Width       int    `json:"width"`
 	Height      int    `json:"height"`
 	Path        string `json:"path"`
+	GeminiFile  string `json:"gemini_file"`
 }
 
+func GetImageCacheWithGeminiFile(url string) string {
+	var cache *ImageCache
+	result, err := common.RedisHashGet("image_url", random.StrToMd5(url))
+	if err == nil {
+		err = json.Unmarshal([]byte(result), &cache)
+		if err == nil {
+			return cache.GeminiFile
+		}
+	}
+	return ""
+}
+func UpdateImageCacheWithGeminiFile(url string, geminiFile string) {
+	var cache *ImageCache
+	result, err := common.RedisHashGet("image_url", random.StrToMd5(url))
+	if err == nil {
+		err = json.Unmarshal([]byte(result), &cache)
+		if err != nil {
+			cache = &ImageCache{
+				GeminiFile: geminiFile,
+			}
+		}
+	} else {
+		cache = &ImageCache{
+			GeminiFile: geminiFile,
+		}
+	}
+	if geminiFile != "" && cache.GeminiFile != geminiFile {
+		cache.GeminiFile = geminiFile
+	}
+	common.RedisHashSet("image_url", random.StrToMd5(url), cache, CacheSecond)
+}
 func setImageCache(url string, isUrl bool, contentType string, width int, height int, path string) {
 	var cache *ImageCache
 	result, err := common.RedisHashGet("image_url", random.StrToMd5(url))
@@ -89,10 +115,11 @@ func IsImageUrl(url string) (bool, string, error) {
 			return cache.IsURL, cache.ContentType, nil
 		}
 	}
-	resp, err := client.UserContentRequestHTTPClient.Get(url)
+	currentClient := client.GetMediaClient(url)
+	resp, err := currentClient.Get(url)
 	if err != nil {
 		//先改为正常请求, 再次报错再进行异常抛出
-		resp, err = imageClient.Get(url)
+		resp, err = client.Ipv4Client.Get(url)
 		if err != nil {
 			logger.SysLogf("IsImageUrl - HTTPClient报错: %s", err.Error())
 			return false, "", err
@@ -135,10 +162,11 @@ func GetImageSizeFromUrl(url string) (width int, height int, err error) {
 	if !isImage {
 		return
 	}
-	resp, err := client.UserContentRequestHTTPClient.Get(url)
+	currentClient := client.GetMediaClient(url)
+	resp, err := currentClient.Get(url)
 	if err != nil {
 		//先改为正常请求, 再次报错再进行异常抛出
-		resp, err = imageClient.Get(url)
+		resp, err = client.Ipv4Client.Get(url)
 		if err != nil {
 			logger.SysLogf("HTTPClient报错: %s", err.Error())
 			return

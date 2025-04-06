@@ -20,14 +20,7 @@ import (
 
 var CacheSecond int64 = 600
 
-var mediaClient *http.Client
-
 func init() {
-	customTransport := http.DefaultTransport.(*http.Transport).Clone()
-	customTransport.Proxy = nil
-	mediaClient = &http.Client{
-		Transport: customTransport,
-	}
 }
 
 type MediaCache struct {
@@ -78,10 +71,11 @@ func IsMediaUrl(url string) (bool, error) {
 			return cache.IsMedia, nil
 		}
 	}
-	resp, err := client.UserContentRequestHTTPClient.Get(url)
+	currentClient := client.GetMediaClient(url)
+	resp, err := currentClient.Get(url)
 	if err != nil {
 		//先改为正常请求, 再次报错再进行异常抛出
-		resp, err = mediaClient.Get(url)
+		resp, err = client.Ipv4Client.Get(url)
 		if err != nil {
 			logger.SysLogf("IsMediaUrl - failed again:  %s", err)
 			setMediaCache(url, false, "", "")
@@ -108,10 +102,11 @@ func SaveMediaByUrl(url string) (error, string, string) {
 			return nil, cache.ContentType, cache.Path
 		}
 	}
-	resp, err := client.UserContentRequestHTTPClient.Get(url)
+	currentClient := client.GetMediaClient(url)
+	resp, err := currentClient.Get(url)
 	if err != nil {
 		//先改为正常请求, 再次报错再进行异常抛出
-		resp, err = mediaClient.Get(url)
+		resp, err = client.Ipv4Client.Get(url)
 		if err != nil {
 			logger.SysLogf("GetMediaUrl - faild again:  %s", err)
 			if resp == nil {
