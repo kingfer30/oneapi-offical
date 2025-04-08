@@ -112,14 +112,15 @@ type ChatSafetyRating struct {
 }
 
 type ChatPromptFeedback struct {
+	BlockReason   string             `json:"blockReason,omitempty"`
 	SafetyRatings []ChatSafetyRating `json:"safetyRatings"`
 }
 
 type ChatResponse struct {
-	Candidates     []ChatCandidate    `json:"candidates"`
-	PromptFeedback ChatPromptFeedback `json:"promptFeedback"`
-	UsageMetadata  *UsageMetaData     `json:"usageMetadata"`
-	ModelVersion   string             `json:"modelVersion"`
+	Candidates     []ChatCandidate     `json:"candidates"`
+	PromptFeedback *ChatPromptFeedback `json:"promptFeedback"`
+	UsageMetadata  *UsageMetaData      `json:"usageMetadata"`
+	ModelVersion   string              `json:"modelVersion"`
 }
 type UsageMetaData struct {
 	PromptTokenCount     int `json:"promptTokenCount"`

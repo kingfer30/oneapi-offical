@@ -50,6 +50,15 @@ var ImageModelList = []string{
 	"gemini-2.0-flash-exp",
 }
 
+var BlockReasonList = map[string]string{
+	"BLOCK_REASON_UNSPECIFIED": "Prompt was blocked.",
+	"SAFETY":                   "Prompt was blocked due to safety reasons. Inspect safetyRatings to understand which safety category blocked it.",
+	"OTHER":                    "Prompt was blocked due to unknown reasons.",
+	"BLOCKLIST":                "Prompt was blocked due to the terms which are included from the terminology blocklist.",
+	"PROHIBITED_CONTENT":       "Prompt was blocked due to prohibited content.",
+	"IMAGE_SAFETY":             "Candidates blocked due to unsafe image generation content.",
+}
+
 func IsImageModel(name string) bool {
 	for _, model := range ImageModelList {
 		if strings.Contains(name, model) {

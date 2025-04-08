@@ -387,7 +387,18 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relay
 			logger.SysError("error unmarshalling stream response: " + err.Error())
 			continue
 		}
-
+		if geminiResponse.PromptFeedback != nil && geminiResponse.PromptFeedback.BlockReason != "" {
+			reason := BlockReasonList[geminiResponse.PromptFeedback.BlockReason]
+			return &relaymodel.ErrorWithStatusCode{
+				Error: relaymodel.Error{
+					Message: reason,
+					Type:    "prompt_error",
+					Param:   "",
+					Code:    403,
+				},
+				StatusCode: 403,
+			}, "", nil
+		}
 		response := streamResponseGeminiChat2OpenAI(&geminiResponse, meta)
 		if response == nil {
 			continue
@@ -443,6 +454,18 @@ func Handler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relaymodel.
 		return openai.ErrorWrapper(err, "unmarshal_response_body_failed", http.StatusInternalServerError), nil
 	}
 	if len(geminiResponse.Candidates) == 0 {
+		if geminiResponse.PromptFeedback != nil && geminiResponse.PromptFeedback.BlockReason != "" {
+			reason := BlockReasonList[geminiResponse.PromptFeedback.BlockReason]
+			return &relaymodel.ErrorWithStatusCode{
+				Error: relaymodel.Error{
+					Message: reason,
+					Type:    "prompt_error",
+					Param:   "",
+					Code:    403,
+				},
+				StatusCode: 403,
+			}, nil
+		}
 		return &relaymodel.ErrorWithStatusCode{
 			Error: relaymodel.Error{
 				Message: "No candidates returned. Check your parameter of max_tokens",
