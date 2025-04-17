@@ -14,12 +14,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
-	"github.com/songquanpeng/one-api/common/image"
 	"github.com/songquanpeng/one-api/common/logger"
-	"github.com/songquanpeng/one-api/common/random"
 	dbmodel "github.com/songquanpeng/one-api/model"
 	channelhelper "github.com/songquanpeng/one-api/relay/adaptor"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
@@ -198,32 +195,32 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 				}
 				c.Set("gemini_delay", delay)
 			} else {
-				if c.GetString("gemini-img-url") != "" {
-					//图片生成, 且报错429, 尝试改为file模式
-					imgUrl := c.GetString("gemini-img-url")
-					fieldUrl := ""
-					if strings.HasPrefix(imgUrl, "http") || strings.HasPrefix(imgUrl, "https") {
-						fieldUrl = imgUrl
-					} else {
-						fieldUrl = random.StrToMd5(imgUrl)
-					}
-					common.RedisHashDel("image_url", random.StrToMd5(imgUrl))
-					mimeType, fileName, err := image.GetImageFromUrl(imgUrl, true)
-					if err == nil {
-						_, fileData, err := FileHandler(c, fieldUrl, imgUrl, mimeType, fileName)
-						if err == nil {
-							image.UpdateImageCacheWithGeminiFile(imgUrl, fileData)
-							logger.SysLogf("图片-429尝试生成Gemini-File - 成功: %s", fileData)
-						}
-					} else {
-						logger.SysLogf("图片-429尝试生成Gemini-File - 错误: %s", err)
-					}
-				} else if !meta.IsImageModel {
-					//非图片模型, 报429的, 尝试使用官方的
-					logger.SysLog("chat 429 尝试转官方lib中...")
-					meta.SelfImplement = true
-				}
-				resp.Body = io.NopCloser(bytes.NewBuffer(requestBody))
+				// if c.GetString("gemini-img-url") != "" {
+				// 	//图片生成, 且报错429, 尝试改为file模式
+				// 	imgUrl := c.GetString("gemini-img-url")
+				// 	fieldUrl := ""
+				// 	if strings.HasPrefix(imgUrl, "http") || strings.HasPrefix(imgUrl, "https") {
+				// 		fieldUrl = imgUrl
+				// 	} else {
+				// 		fieldUrl = random.StrToMd5(imgUrl)
+				// 	}
+				// 	common.RedisHashDel("image_url", random.StrToMd5(imgUrl))
+				// 	mimeType, fileName, err := image.GetImageFromUrl(imgUrl, true)
+				// 	if err == nil {
+				// 		_, fileData, err := FileHandler(c, fieldUrl, imgUrl, mimeType, fileName)
+				// 		if err == nil {
+				// 			image.UpdateImageCacheWithGeminiFile(imgUrl, fileData)
+				// 			logger.SysLogf("图片-429尝试生成Gemini-File - 成功: %s", fileData)
+				// 		}
+				// 	} else {
+				// 		logger.SysLogf("图片-429尝试生成Gemini-File - 错误: %s", err)
+				// 	}
+				// } else if !meta.IsImageModel {
+				// 	//非图片模型, 报429的, 尝试使用官方的
+				// 	logger.SysLog("chat 429 尝试转官方lib中...")
+				// 	meta.SelfImplement = true
+				// }
+				// resp.Body = io.NopCloser(bytes.NewBuffer(requestBody))
 			}
 		}
 	}
