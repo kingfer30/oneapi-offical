@@ -3,6 +3,7 @@ package model
 type Usage struct {
 	PromptTokens     int `json:"prompt_tokens"`
 	CompletionTokens int `json:"completion_tokens"`
+	ThoughtsTokens   int `json:"thoughts_tokens,omitempty"`
 	TotalTokens      int `json:"total_tokens"`
 }
 

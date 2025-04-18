@@ -421,6 +421,7 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relay
 		usage = &relaymodel.Usage{
 			PromptTokens:     prompt,
 			CompletionTokens: completion,
+			ThoughtsTokens:   geminiResponse.UsageMetadata.ThoughtsTokenCount,
 			TotalTokens:      quota,
 		}
 		response.Usage = usage
@@ -498,6 +499,7 @@ func Handler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relaymodel.
 		usage = relaymodel.Usage{
 			PromptTokens:     prompt,
 			CompletionTokens: completion,
+			ThoughtsTokens:   geminiResponse.UsageMetadata.ThoughtsTokenCount,
 			TotalTokens:      quota,
 		}
 	} else {
