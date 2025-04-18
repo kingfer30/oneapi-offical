@@ -84,19 +84,19 @@ type ChatTools struct {
 }
 
 type ChatGenerationConfig struct {
-	ResponseMimeType   string   `json:"responseMimeType,omitempty"`
-	ResponseModalities []string `json:"responseModalities,omitempty"`
-	ResponseSchema     any      `json:"responseSchema,omitempty"`
-	Temperature        *float64 `json:"temperature,omitempty"`
-	TopP               *float64 `json:"topP,omitempty"`
-	TopK               float64  `json:"topK,omitempty"`
-	MaxOutputTokens    int      `json:"maxOutputTokens,omitempty"`
-	CandidateCount     int      `json:"candidateCount,omitempty"`
-	StopSequences      any      `json:"stopSequences,omitempty"`
-	// ThinkingConfig   ThinkingConfig `json:"thinkingConfig,omitempty"`
+	ResponseMimeType   string          `json:"responseMimeType,omitempty"`
+	ResponseModalities []string        `json:"responseModalities,omitempty"`
+	ResponseSchema     any             `json:"responseSchema,omitempty"`
+	Temperature        *float64        `json:"temperature,omitempty"`
+	TopP               *float64        `json:"topP,omitempty"`
+	TopK               float64         `json:"topK,omitempty"`
+	MaxOutputTokens    int             `json:"maxOutputTokens,omitempty"`
+	CandidateCount     int             `json:"candidateCount,omitempty"`
+	StopSequences      any             `json:"stopSequences,omitempty"`
+	ThinkingConfig     *ThinkingConfig `json:"thinkingConfig,omitempty"`
 }
 type ThinkingConfig struct {
-	IncludeThoughts bool `json:"includeThoughts,omitempty"`
+	ThinkingBudget *int `json:"thinkingBudget,omitempty"`
 }
 
 type ChatCandidate struct {
@@ -125,6 +125,7 @@ type ChatResponse struct {
 type UsageMetaData struct {
 	PromptTokenCount     int `json:"promptTokenCount"`
 	CandidatesTokenCount int `json:"candidatesTokenCount"`
+	ThoughtsTokenCount   int `json:"thoughtsTokenCount"`
 	TotalTokenCount      int `json:"totalTokenCount"`
 }
 

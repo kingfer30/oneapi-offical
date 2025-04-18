@@ -498,7 +498,7 @@ func GetCompletionRatio(name string, channelType int) float64 {
 		return 3
 	}
 	if strings.HasPrefix(name, "gemini-") {
-		return 3
+		return 4
 	}
 	if strings.HasPrefix(name, "deepseek-") {
 		return 2

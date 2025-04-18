@@ -35,6 +35,7 @@ type Meta struct {
 	SystemPrompt    string
 	Thinking        bool
 	EndThinking     bool
+	UseThinking     bool
 	SelfImplement   bool
 	IsImageModel    bool
 	Image2Chat      bool

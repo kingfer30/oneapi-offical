@@ -7,10 +7,15 @@ import (
 	"github.com/songquanpeng/one-api/relay/meta"
 )
 
-func ResetChatQuota(usePrompt int, useCompletion int, useTotal int, stream bool, meta *meta.Meta) (int, int, int) {
+func ResetChatQuota(usePrompt int, useCompletion int, useThoughts int, useTotal int, stream bool, meta *meta.Meta) (int, int, int) {
 	modelRatio := billingratio.GetModelRatio(meta.ActualModelName, meta.ChannelType, meta.Group)
 	groupRatio := billingratio.GetGroupRatio(meta.Group)
-	completionRatio := billingratio.GetCompletionRatio(meta.ActualModelName, meta.ChannelType)
+	name := meta.ActualModelName
+	if useThoughts > 0 {
+		meta.UseThinking = true
+		name = name + "-thinking"
+	}
+	completionRatio := billingratio.GetCompletionRatio(name, meta.ChannelType)
 	ratio := modelRatio * groupRatio
 	quota := 0
 	//如果非流 且 没有补全token, 按照倍率*1000

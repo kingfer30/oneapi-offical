@@ -48,6 +48,11 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 	if IsImageModel(textRequest.Model) {
 		generationConfig.ResponseModalities = []string{"text", "image"}
 	}
+	if textRequest.ThinkingBudget != nil {
+		generationConfig.ThinkingConfig = &ThinkingConfig{
+			ThinkingBudget: textRequest.ThinkingBudget,
+		}
+	}
 	geminiRequest := ChatRequest{
 		Contents:         make([]ChatContent, 0, len(textRequest.Messages)),
 		GenerationConfig: generationConfig,
@@ -408,6 +413,7 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relay
 		prompt, completion, quota := ResetChatQuota(
 			geminiResponse.UsageMetadata.PromptTokenCount,
 			geminiResponse.UsageMetadata.CandidatesTokenCount,
+			geminiResponse.UsageMetadata.ThoughtsTokenCount,
 			geminiResponse.UsageMetadata.TotalTokenCount,
 			true,
 			meta,
@@ -453,6 +459,7 @@ func Handler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relaymodel.
 	if err != nil {
 		return openai.ErrorWrapper(err, "unmarshal_response_body_failed", http.StatusInternalServerError), nil
 	}
+
 	if len(geminiResponse.Candidates) == 0 {
 		if geminiResponse.PromptFeedback != nil && geminiResponse.PromptFeedback.BlockReason != "" {
 			reason := BlockReasonList[geminiResponse.PromptFeedback.BlockReason]
@@ -483,6 +490,7 @@ func Handler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relaymodel.
 		prompt, completion, quota := ResetChatQuota(
 			geminiResponse.UsageMetadata.PromptTokenCount,
 			geminiResponse.UsageMetadata.CandidatesTokenCount,
+			geminiResponse.UsageMetadata.ThoughtsTokenCount,
 			geminiResponse.UsageMetadata.TotalTokenCount,
 			false,
 			meta,
