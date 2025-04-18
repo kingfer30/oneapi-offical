@@ -42,6 +42,7 @@ var ModelList = []string{
 	"gemini-embedding-exp",
 	"embedding-001",
 	"gemini-2.5-pro-exp-03-25",
+	"gemini-2.5-flash-preview-04-17",
 }
 
 //定义支持画图的模型
