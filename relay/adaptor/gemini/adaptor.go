@@ -215,12 +215,12 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 				// 	} else {
 				// 		logger.SysLogf("图片-429尝试生成Gemini-File - 错误: %s", err)
 				// 	}
-				// } else if !meta.IsImageModel {
+				// } else {
 				// 	//非图片模型, 报429的, 尝试使用官方的
 				// 	logger.SysLog("chat 429 尝试转官方lib中...")
 				// 	meta.SelfImplement = true
 				// }
-				// resp.Body = io.NopCloser(bytes.NewBuffer(requestBody))
+				resp.Body = io.NopCloser(bytes.NewBuffer(requestBody))
 			}
 		}
 	}
