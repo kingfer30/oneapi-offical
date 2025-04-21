@@ -404,6 +404,17 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relay
 				StatusCode: 403,
 			}, "", nil
 		}
+		if len(geminiResponse.Candidates) > 0 && strings.ToUpper(geminiResponse.Candidates[0].FinishReason) == "MAX_TOKENS" {
+			return &relaymodel.ErrorWithStatusCode{
+				Error: relaymodel.Error{
+					Message: "No candidates returned. Check your parameter of max_tokens",
+					Type:    "prompt_error",
+					Param:   "",
+					Code:    400,
+				},
+				StatusCode: 400,
+			}, "", nil
+		}
 		response := streamResponseGeminiChat2OpenAI(&geminiResponse, meta)
 		if response == nil {
 			continue
@@ -460,7 +471,6 @@ func Handler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relaymodel.
 	if err != nil {
 		return openai.ErrorWrapper(err, "unmarshal_response_body_failed", http.StatusInternalServerError), nil
 	}
-
 	if len(geminiResponse.Candidates) == 0 {
 		if geminiResponse.PromptFeedback != nil && geminiResponse.PromptFeedback.BlockReason != "" {
 			reason := BlockReasonList[geminiResponse.PromptFeedback.BlockReason]
@@ -479,7 +489,18 @@ func Handler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relaymodel.
 				Message: "No candidates returned. Check your parameter of max_tokens",
 				Type:    "server_error",
 				Param:   "",
-				Code:    500,
+				Code:    400,
+			},
+			StatusCode: 400,
+		}, nil
+	}
+	if len(geminiResponse.Candidates) > 0 && strings.ToUpper(geminiResponse.Candidates[0].FinishReason) == "MAX_TOKENS" {
+		return &relaymodel.ErrorWithStatusCode{
+			Error: relaymodel.Error{
+				Message: "No candidates returned. Check your parameter of max_tokens",
+				Type:    "prompt_error",
+				Param:   "",
+				Code:    400,
 			},
 			StatusCode: 400,
 		}, nil
