@@ -167,6 +167,8 @@ github.com/kingfer30/tiktoken-go v0.2.2 h1:hxDa8dhwbZAKXP8HheWlVna32BzJyIDXwbLa5
 github.com/kingfer30/tiktoken-go v0.2.2/go.mod h1:1gwynd8+hTLR6wrOCZzu63b1u9QKIkFYV+BfhccjK6M=
 github.com/kingfer30/tiktoken-go v0.2.3 h1:gPzQjhntCRSTFfTCWG8e66yj8p0z+Z/9I9w3Ed3gQOU=
 github.com/kingfer30/tiktoken-go v0.2.3/go.mod h1:1gwynd8+hTLR6wrOCZzu63b1u9QKIkFYV+BfhccjK6M=
+github.com/kingfer30/tiktoken-go v0.2.4 h1:qMVpiqgdanAgVntwIPuwZ9sI3Q/WuI5oLlHY6rNvPh4=
+github.com/kingfer30/tiktoken-go v0.2.4/go.mod h1:1gwynd8+hTLR6wrOCZzu63b1u9QKIkFYV+BfhccjK6M=
 github.com/klauspost/cpuid/v2 v2.0.9/go.mod h1:FInQzS24/EEf25PyTYn52gqo7WaD8xa0213Md/qVLRg=
 github.com/klauspost/cpuid/v2 v2.2.7 h1:ZWSB3igEs+d0qvnxR/ZBzXVmxkgt8DdzP6m9pfuVLDM=
 github.com/klauspost/cpuid/v2 v2.2.7/go.mod h1:Lcz8mBdAVJIBVzewtcLocK12l3Y+JytZYpaMropDUws=

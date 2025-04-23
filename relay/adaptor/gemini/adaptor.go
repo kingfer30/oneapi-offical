@@ -175,25 +175,53 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 			if err == nil && len(geminiErr.Error.Details) > 0 {
 				delay := 60
 				re := regexp.MustCompile(`\d+`)
+				exceedQuota := false
 				for _, detail := range geminiErr.Error.Details {
 					if detail.RetryDelay != "" {
 						num := re.FindString(detail.RetryDelay)
 						delay, _ = strconv.Atoi(num)
 						break
 					}
+					if strings.Contains(detail.Type, "QuotaFailure") {
+						exceedQuota = true
+					}
 				}
-				openaiErr := openai.ErrorWrapper(
-					fmt.Errorf("Guo - Resource has been exhausted"),
-					"too_many_requests",
-					http.StatusTooManyRequests,
-				)
-				errData, err := json.Marshal(openaiErr)
-				if err == nil {
-					resp.Body = io.NopCloser(bytes.NewBuffer(errData))
-				} else {
-					resp.Body = io.NopCloser(bytes.NewBuffer(requestBody))
+				retry := false
+				if exceedQuota && IsLowTpmModel(meta.ActualModelName) {
+					logger.SysLogf("[高Token重试] 当前请求TPM过高, 尝试新方法请求..")
+					newRequest, err := ChangeChat2TxtRequest(c, *meta.TextRequest)
+					if err == nil {
+						jsonData, err := json.Marshal(newRequest)
+						if err == nil {
+							logger.SysLogf("[高Token重试] body: %s", string(jsonData))
+							body := bytes.NewBuffer(jsonData)
+							resp, err = a.DoRequest(c, meta, body)
+							if err == nil {
+								retry = true
+							} else {
+								logger.SysLogf("[高Token重试] json.Marshal(newRequest): %s", err.Error())
+							}
+						} else {
+							logger.SysLogf("[高Token重试] json.Marshal(newRequest): %s", err.Error())
+						}
+					} else {
+						logger.SysLogf("[高Token重试] 执行异常, 将返回错误: %s", err)
+					}
 				}
-				c.Set("gemini_delay", delay)
+				if !retry {
+					openaiErr := openai.ErrorWrapper(
+						fmt.Errorf("Guo - Resource has been exhausted"),
+						"too_many_requests",
+						http.StatusTooManyRequests,
+					)
+					errData, err := json.Marshal(openaiErr)
+					if err == nil {
+						resp.Body = io.NopCloser(bytes.NewBuffer(errData))
+					} else {
+						resp.Body = io.NopCloser(bytes.NewBuffer(requestBody))
+					}
+					c.Set("gemini_delay", delay)
+				}
 			} else {
 				// if c.GetString("gemini-img-url") != "" {
 				// 	//图片生成, 且报错429, 尝试改为file模式

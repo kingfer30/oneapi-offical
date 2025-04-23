@@ -51,6 +51,11 @@ var ImageModelList = []string{
 	"gemini-2.0-flash-exp",
 }
 
+//定义低TPM的模型
+var LowTPMModelList = []string{
+	"gemini-2.5-pro-exp-03-25",
+}
+
 var BlockReasonList = map[string]string{
 	"BLOCK_REASON_UNSPECIFIED": "Prompt was blocked.",
 	"SAFETY":                   "Prompt was blocked due to safety reasons. Inspect safetyRatings to understand which safety category blocked it.",
@@ -62,6 +67,15 @@ var BlockReasonList = map[string]string{
 
 func IsImageModel(name string) bool {
 	for _, model := range ImageModelList {
+		if strings.Contains(name, model) {
+			return true
+		}
+	}
+	return false
+}
+
+func IsLowTpmModel(name string) bool {
+	for _, model := range LowTPMModelList {
 		if strings.Contains(name, model) {
 			return true
 		}

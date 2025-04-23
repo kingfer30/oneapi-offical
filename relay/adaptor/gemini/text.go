@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/songquanpeng/one-api/common/config"
@@ -542,4 +543,133 @@ func Handler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relaymodel.
 	c.Writer.WriteHeader(resp.StatusCode)
 	_, _ = c.Writer.Write(jsonResponse)
 	return nil, &usage
+}
+func ChangeChat2TxtRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest) (*ChatRequest, error) {
+	generationConfig := ChatGenerationConfig{
+		Temperature:     textRequest.Temperature,
+		TopP:            textRequest.TopP,
+		MaxOutputTokens: textRequest.MaxTokens,
+		StopSequences:   textRequest.Stop,
+	}
+	if textRequest.ThinkingBudget != nil {
+		generationConfig.ThinkingConfig = &ThinkingConfig{
+			ThinkingBudget: textRequest.ThinkingBudget,
+		}
+	}
+	geminiRequest := ChatRequest{
+		Contents:         make([]ChatContent, 0),
+		GenerationConfig: generationConfig,
+	}
+	if textRequest.ResponseFormat != nil {
+		if mimeType, ok := mimeTypeMap[textRequest.ResponseFormat.Type]; ok {
+			geminiRequest.GenerationConfig.ResponseMimeType = mimeType
+		}
+		if textRequest.ResponseFormat.Schema != nil {
+			geminiRequest.GenerationConfig.ResponseSchema = textRequest.ResponseFormat.Schema
+			geminiRequest.GenerationConfig.ResponseMimeType = mimeTypeMap["json_object"]
+		}
+	}
+	userContent := ""
+	var parts []Part
+	for _, message := range textRequest.Messages {
+		msg := message.StringContent()
+		if msg != "" {
+			userContent = userContent + msg + "\r\n"
+		}
+		openaiContent := message.ParseContent()
+		imageNum := 0
+		for _, part := range openaiContent {
+			if part.Type == relaymodel.ContentTypeText {
+				msg = part.Text
+				if msg != "" {
+					userContent = userContent + msg + "\r\n"
+				}
+			} else if part.Type == relaymodel.ContentTypeImageURL {
+				imageNum += 1
+				if imageNum > VisionMaxImageNum {
+					continue
+				}
+				mimeType := ""
+				fileData := ""
+				var err error
+				ok, err := media.IsMediaUrl(part.ImageURL.Url)
+				if err != nil {
+					return nil, err
+				}
+				if ok {
+					mimeType, fileData, err = FileHandler(c, part.ImageURL.Url, part.ImageURL.Url, "", "")
+					if err != nil {
+						return nil, err
+					}
+					parts = append(parts, Part{
+						FileData: &FileData{
+							MimeType: mimeType,
+							Uri:      fileData,
+						},
+					})
+				} else {
+					mimeType, fileData, err = image.GetImageFromUrl(part.ImageURL.Url, false)
+					if err != nil {
+						return nil, err
+					}
+					//这里走原始的图片逻辑, 是取b64传给gemini, 保存起来是用于有些prompt请求一直会429, 外层判断429后会改为上面那种方式
+					c.Set("gemini-img-url", part.ImageURL.Url)
+					parts = append(parts, Part{
+						InlineData: &InlineData{
+							MimeType: mimeType,
+							Data:     fileData,
+						},
+					})
+				}
+			}
+		}
+	}
+
+	//内容转入文本文件, 并向gemini提问: 请打开我上传的txt文件, 回答文件内容的问题, 注意参考我上传的所有文件来作答
+	// 判断文件夹是否存在
+	dirPath := "/mnt/tpm_file"
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		// 文件夹不存在，创建新的文件夹
+		err := os.MkdirAll(dirPath, 0755) // 0755 是文件夹的权限设置
+		if err != nil {
+			logger.SysLogf("ChangeChat2TxtRequest - Error: MkdirAll temporary file: =>create dic failed: %s", err)
+			return nil, err
+		}
+	} else if err != nil {
+		// 其他错误
+		logger.SysLogf("ChangeChat2TxtRequest - Error: MkdirAll temporary file: =>create dic error failed : %s", err)
+		return nil, err
+	}
+	tmp_name := fmt.Sprintf("%s/tmpfile_%s.txt", dirPath, random.GetRandomNumberString(16))
+	err := os.WriteFile(tmp_name, []byte(userContent), 0755)
+	if err != nil {
+		logger.SysLogf("ChangeChat2TxtRequest - Error:os.WriteFile : %s", err)
+		return nil, err
+	}
+	mimeType, fileData, err := FileHandler(c, random.StrToMd5(userContent), "", "text/plain", tmp_name)
+	if err != nil {
+		return nil, err
+	}
+	parts = append(parts, Part{
+		FileData: &FileData{
+			MimeType: mimeType,
+			Uri:      fileData,
+		},
+	})
+
+	parts = append(parts, Part{
+		Text: "Please open the txt file I uploaded and answer the questions in the file. Please refer to all the files I uploaded to answer the questions.",
+	})
+	content := ChatContent{
+		Role:  "User",
+		Parts: parts,
+	}
+
+	geminiRequest.Contents = append(geminiRequest.Contents, content)
+	//删除文件
+	if err := os.Remove(tmp_name); err != nil {
+		logger.SysLogf("ChangeChat2TxtRequest - Error:os.Remove : %s", err)
+	}
+
+	return &geminiRequest, nil
 }

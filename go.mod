@@ -22,7 +22,7 @@ require (
 	github.com/gorilla/websocket v1.5.1
 	github.com/jinzhu/copier v0.4.0
 	github.com/joho/godotenv v1.5.1
-	github.com/kingfer30/tiktoken-go v0.2.3
+	github.com/kingfer30/tiktoken-go v0.2.4
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/smartystreets/goconvey v1.8.1

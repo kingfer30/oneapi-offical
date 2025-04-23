@@ -241,6 +241,9 @@ func CheckLegalUrl(apiType int, contentType string) (string, error) {
 		//pdf
 		case "application/pdf":
 			return "pdf", nil
+		//txt
+		case "text/plain":
+			return "txt", nil
 		//音频
 		case "audio/x-wav":
 			return "wav", nil
