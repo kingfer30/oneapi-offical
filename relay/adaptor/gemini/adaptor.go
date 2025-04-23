@@ -187,8 +187,9 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 					}
 				}
 				retry := false
-				if exceedQuota && IsLowTpmModel(meta.ActualModelName) {
+				if exceedQuota && IsLowTpmModel(meta.ActualModelName) && meta.TxtRequestCount <= 3 {
 					logger.SysLogf("[高Token重试] 当前请求TPM过高, 尝试新方法请求..")
+					meta.TxtRequestCount++
 					newRequest, err := ChangeChat2TxtRequest(c, *meta.TextRequest)
 					if err == nil {
 						jsonData, err := json.Marshal(newRequest)

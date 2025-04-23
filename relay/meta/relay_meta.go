@@ -40,6 +40,7 @@ type Meta struct {
 	IsImageModel    bool
 	Image2Chat      bool
 	TextRequest     *relaymodel.GeneralOpenAIRequest
+	TxtRequestCount int
 }
 
 func GetByContext(c *gin.Context) *Meta {
