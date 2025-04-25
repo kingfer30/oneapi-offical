@@ -194,7 +194,7 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 					if err == nil {
 						jsonData, err := json.Marshal(newRequest)
 						if err == nil {
-							logger.SysLogf("[高Token重试] body: %s", string(jsonData))
+							// logger.SysLogf("[高Token重试] body: %s", string(jsonData))
 							body := bytes.NewBuffer(jsonData)
 							resp, err = a.DoRequest(c, meta, body)
 							if err == nil {
