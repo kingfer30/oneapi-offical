@@ -87,7 +87,25 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 		geminiEmbeddingRequest := ConvertEmbeddingRequest(*request)
 		return geminiEmbeddingRequest, nil
 	default:
-		geminiRequest, err := ConvertRequest(c, *request)
+		needHighTPMRequest := false
+		if IsLowTpmModel(request.Model) {
+			apiKey := strings.TrimPrefix(c.Request.Header.Get("Authorization"), "Bearer ")
+			total, err := GetTokens(c, request, apiKey)
+			if err == nil {
+				if total > LowTPMModelMapping[request.Model] {
+					logger.SysLogf("[高Token重试] 当前TPM过高 %d", total)
+					needHighTPMRequest = true
+				}
+			}
+		}
+		var geminiRequest *ChatRequest
+		var err error
+		if needHighTPMRequest {
+			c.Set("no_retry_high_tpm", true)
+			geminiRequest, err = ChangeChat2TxtRequest(c, *request)
+		} else {
+			geminiRequest, err = ConvertRequest(c, *request)
+		}
 		if err != nil {
 			b, jerr := json.Marshal(geminiRequest)
 			if jerr == nil {
@@ -182,7 +200,7 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 						delay, _ = strconv.Atoi(num)
 						break
 					}
-					if strings.Contains(detail.Type, "QuotaFailure") {
+					if strings.Contains(detail.Type, "QuotaFailure") && !c.GetBool("no_retry_high_tpm") {
 						exceedQuota = true
 					}
 				}

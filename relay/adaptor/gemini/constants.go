@@ -56,6 +56,11 @@ var LowTPMModelList = []string{
 	"gemini-2.5-pro-exp-03-25",
 }
 
+//定义低TPM的模型映射
+var LowTPMModelMapping = map[string]int{
+	"gemini-2.5-pro-exp-03-25": 250000,
+}
+
 var BlockReasonList = map[string]string{
 	"BLOCK_REASON_UNSPECIFIED": "Prompt was blocked.",
 	"SAFETY":                   "Prompt was blocked due to safety reasons. Inspect safetyRatings to understand which safety category blocked it.",

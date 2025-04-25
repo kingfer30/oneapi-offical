@@ -504,3 +504,172 @@ func handleGenaiError(err error, canAs bool, meta *meta.Meta) *relaymodel.ErrorW
 		return openai.ErrorWrapper(err, "agg_genai_error", http.StatusInternalServerError)
 	}
 }
+
+func GetTokens(c *gin.Context, textRequest *relaymodel.GeneralOpenAIRequest, apiKey string) (int, error) {
+	client, err := genai.NewClient(c, option.WithAPIKey(apiKey))
+
+	if err != nil {
+		return 0, err
+	}
+	defer client.Close()
+
+	model := client.GenerativeModel(textRequest.Model)
+
+	model.SafetySettings = []*genai.SafetySetting{
+		{
+			Category:  genai.HarmCategoryDangerousContent,
+			Threshold: genai.HarmBlockNone,
+		},
+		{
+			Category:  genai.HarmCategoryHarassment,
+			Threshold: genai.HarmBlockNone,
+		},
+		{
+			Category:  genai.HarmCategoryHateSpeech,
+			Threshold: genai.HarmBlockNone,
+		},
+		{
+			Category:  genai.HarmCategorySexuallyExplicit,
+			Threshold: genai.HarmBlockNone,
+		},
+	}
+	if textRequest.Temperature != nil {
+		model.SetTemperature(float32(*textRequest.Temperature))
+	}
+	if textRequest.TopP != nil {
+		model.SetTopP(float32(*textRequest.TopP))
+	}
+	if textRequest.Stop != nil {
+		seq, ok := textRequest.Stop.([]string)
+		if !ok {
+			seq, ok := textRequest.Stop.(string)
+			if ok {
+				model.StopSequences = []string{
+					seq,
+				}
+			}
+		} else {
+			model.StopSequences = seq
+		}
+	}
+	if textRequest.MaxTokens != 0 {
+		model.SetMaxOutputTokens(int32(textRequest.MaxTokens))
+	}
+	if textRequest.ResponseFormat != nil {
+		if mimeType, ok := mimeTypeMap[textRequest.ResponseFormat.Type]; ok {
+			model.ResponseMIMEType = mimeType
+		}
+		if textRequest.ResponseFormat.Schema != nil {
+			model.ResponseSchema = &genai.Schema{
+				Type:        genai.TypeArray,
+				Format:      textRequest.ResponseFormat.Schema.Format,
+				Description: textRequest.ResponseFormat.Schema.Description,
+				Nullable:    textRequest.ResponseFormat.Schema.Nullable,
+				Enum:        textRequest.ResponseFormat.Schema.Enum,
+				Required:    textRequest.ResponseFormat.Schema.Required,
+			}
+			model.ResponseMIMEType = mimeTypeMap["json_object"]
+		}
+	}
+	var tools []*genai.Tool
+	if textRequest.Tools != nil {
+		for _, tool := range textRequest.Tools {
+			params, ok := tool.Function.Parameters.(*genai.Schema)
+			if ok {
+				tools = append(tools, &genai.Tool{FunctionDeclarations: []*genai.FunctionDeclaration{
+					{
+						Name:        tool.Function.Name,
+						Description: tool.Function.Description,
+						Parameters:  params,
+					},
+				}})
+			} else {
+				tools = append(tools, &genai.Tool{FunctionDeclarations: []*genai.FunctionDeclaration{
+					{
+						Name:        tool.Function.Name,
+						Description: tool.Function.Description,
+					},
+				}})
+			}
+		}
+	}
+	model.Tools = tools
+
+	var tokenResult *genai.CountTokensResponse
+	var tokenErr error
+
+	if len(textRequest.Messages) == 1 {
+		parts, err := generateParts(c, textRequest.Messages[0])
+		if err != nil {
+			return 0, err
+		}
+		tokenResult, tokenErr = model.CountTokens(c, parts...)
+	} else {
+		nextRole := "user"
+		var content []*genai.Content
+		for k, message := range textRequest.Messages {
+			msgParts, err := generateParts(c, message)
+			if err != nil {
+				return 0, err
+			}
+
+			// there's cannt start with assistant role
+			if message.Role == "assistant" && k == 0 {
+				content = append(content, &genai.Content{
+					Parts: []genai.Part{genai.Text("Hello")},
+					Role:  "user",
+				})
+				nextRole = "model"
+			}
+
+			// there's no assistant role in gemini and API shall vomit if Role is not user or model
+			if message.Role == "assistant" || message.Role == "system" {
+				message.Role = "model"
+			}
+			// per chat need gemini-user
+			if (message.Role == "model" || message.Role == "system" || message.Role == "assistant") && nextRole == "user" {
+				content = append(content, &genai.Content{
+					Parts: []genai.Part{genai.Text("Hello")},
+					Role:  "user",
+				})
+				nextRole = "model"
+			} else if message.Role == "user" && nextRole == "model" {
+				content = append(content, &genai.Content{
+					Parts: []genai.Part{genai.Text("Hi")},
+					Role:  "model",
+				})
+				nextRole = "user"
+			}
+			if message.Role == "user" {
+				nextRole = "model"
+			} else {
+				nextRole = "user"
+			}
+
+			content = append(content, &genai.Content{
+				Parts: msgParts,
+				Role:  message.Role,
+			})
+		}
+		if nextRole == "user" {
+			content = append(content, &genai.Content{
+				Parts: []genai.Part{genai.Text("Ask my question")},
+				Role:  "user",
+			})
+		}
+		//这里理应为多条消息, 如果最后只有一条, 应该报错
+		if len(content) == 1 {
+			return 0, fmt.Errorf("error_genai_content_length")
+		}
+		//最后一条为发送内容, 其他为历史
+		last := content[len(content)-1]
+		content = content[:len(content)-1]
+		cs := model.StartChat()
+		cs.History = content
+		tokenResult, tokenErr = model.CountTokens(c, last.Parts...)
+	}
+	if tokenErr != nil {
+		return 0, tokenErr
+	}
+	return int(tokenResult.TotalTokens), nil
+}
