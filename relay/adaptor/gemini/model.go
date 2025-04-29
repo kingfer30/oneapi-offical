@@ -80,7 +80,12 @@ type ChatSafetySettings struct {
 }
 
 type ChatTools struct {
-	FunctionDeclarations any `json:"function_declarations,omitempty"`
+	FunctionDeclarations  any          `json:"function_declarations,omitempty"`
+	GoogleSearchRetrieval any          `json:"google_search_retrieval,omitempty"`
+	CodeExecution         any          `json:"code_execution,omitempty"`
+	GoogleSearch          GoogleSearch `json:"google_search,omitempty"`
+}
+type GoogleSearch struct {
 }
 
 type ChatGenerationConfig struct {

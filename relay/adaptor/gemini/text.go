@@ -71,15 +71,23 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 		}
 	}
 	if textRequest.Tools != nil {
-		functions := make([]relaymodel.Function, 0, len(textRequest.Tools))
+		var tools []ChatTools
+		var functions []relaymodel.Function
 		for _, tool := range textRequest.Tools {
+			if tool.Type == "google_search_tool" {
+				tools = append(tools, ChatTools{
+					GoogleSearch: GoogleSearch{},
+				})
+				continue
+			}
 			functions = append(functions, tool.Function)
 		}
-		geminiRequest.Tools = []ChatTools{
-			{
+		if len(functions) > 0 {
+			tools = append(tools, ChatTools{
 				FunctionDeclarations: functions,
-			},
+			})
 		}
+		geminiRequest.Tools = tools
 	} else if textRequest.Functions != nil {
 		geminiRequest.Tools = []ChatTools{
 			{
