@@ -87,3 +87,10 @@ func IsLowTpmModel(name string) bool {
 	}
 	return false
 }
+
+func IsNeedToAddRandomModel(model string) bool {
+	if strings.Contains(model, "flash") {
+		return true
+	}
+	return false
+}
