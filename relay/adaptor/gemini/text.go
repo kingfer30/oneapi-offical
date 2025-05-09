@@ -261,7 +261,15 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 		name := random.GetRandomString(10)
 		//需要添加随机字符以减少被gemini识别为自动程序
 		if geminiRequest.Contents[0].Role == "user" {
-			geminiRequest.Contents[0].Parts[0].Text = fmt.Sprintf("I'm %s, dont say my name\n%s", name, geminiRequest.Contents[0].Parts[0].Text)
+			if geminiRequest.Contents[0].Parts[0].Text != "" {
+				geminiRequest.Contents[0].Parts[0].Text = fmt.Sprintf("I'm %s, dont say my name\n%s", name, geminiRequest.Contents[0].Parts[0].Text)
+			} else {
+				geminiRequest.Contents[0].Parts = append([]Part{
+					{
+						Text: fmt.Sprintf("I'm %s, dont say my name", name),
+					},
+				}, geminiRequest.Contents[0].Parts...)
+			}
 		} else {
 			geminiRequest.Contents = append([]ChatContent{
 				{
