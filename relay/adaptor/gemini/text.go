@@ -283,7 +283,15 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 			}, geminiRequest.Contents...)
 		}
 		if len(geminiRequest.Contents) > 1 {
-			geminiRequest.Contents[len(geminiRequest.Contents)-1].Parts[0].Text = fmt.Sprintf("I'm %s, dont say my name\n%s", name, geminiRequest.Contents[len(geminiRequest.Contents)-1].Parts[0].Text)
+			if geminiRequest.Contents[len(geminiRequest.Contents)-1].Parts[0].Text != "" {
+				geminiRequest.Contents[len(geminiRequest.Contents)-1].Parts[0].Text = fmt.Sprintf("I'm %s, dont say my name\n%s", name, geminiRequest.Contents[len(geminiRequest.Contents)-1].Parts[0].Text)
+			} else {
+				geminiRequest.Contents[len(geminiRequest.Contents)-1].Parts = append(geminiRequest.Contents[len(geminiRequest.Contents)-1].Parts,
+					Part{
+						Text: fmt.Sprintf("I'm %s, dont say my name", name),
+					},
+				)
+			}
 		}
 	}
 
