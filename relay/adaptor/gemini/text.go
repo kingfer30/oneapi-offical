@@ -112,63 +112,30 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 		openaiContent := message.ParseContent()
 		var parts []Part
 		imageNum := 0
-		for _, part := range openaiContent {
-			if part.Type == relaymodel.ContentTypeText {
-				msg = part.Text
-				if msg == "" {
-					msg = "Hi"
-				}
-				parts = append(parts, Part{
-					Text: msg,
-				})
-			} else if part.Type == relaymodel.ContentTypeImageURL {
-				imageNum += 1
-				if imageNum > VisionMaxImageNum {
-					continue
-				}
-				mimeType := ""
-				fileData := ""
-				var err error
-				ok, err := media.IsMediaUrl(part.ImageURL.Url)
-				if err != nil {
-					return nil, err
-				}
-				if ok {
-					mimeType, fileData, err = FileHandler(c, part.ImageURL.Url, part.ImageURL.Url, "", "")
+		if len(openaiContent) > 0 {
+			for _, part := range openaiContent {
+				if part.Type == relaymodel.ContentTypeText {
+					msg = part.Text
+					if msg == "" {
+						msg = "Hi"
+					}
+					parts = append(parts, Part{
+						Text: msg,
+					})
+				} else if part.Type == relaymodel.ContentTypeImageURL {
+					imageNum += 1
+					if imageNum > VisionMaxImageNum {
+						continue
+					}
+					mimeType := ""
+					fileData := ""
+					var err error
+					ok, err := media.IsMediaUrl(part.ImageURL.Url)
 					if err != nil {
 						return nil, err
 					}
-					parts = append(parts, Part{
-						FileData: &FileData{
-							MimeType: mimeType,
-							Uri:      fileData,
-						},
-					})
-				} else {
-					// 这里图片统一转为File, 因为base64经常报错
-					// 以下的情形会强制开启图片上传gemini:
-					// 1. 后台统一开启,
-					// 2. chat对话中使用了画图模型, 对话角色=系统的也强制开启, 用户的不管
-					// 3. 用户图片的, 但是第一次请求报错429的, 会改为这种
-					if config.GeminiUploadImageEnabled || (IsImageModel(textRequest.Model) && content.Role != "user") ||
-						(image.GetImageCacheWithGeminiFile(part.ImageURL.Url) != "") {
-						fileName := ""
-						fieldUrl := ""
-						if strings.HasPrefix(part.ImageURL.Url, "http") || strings.HasPrefix(part.ImageURL.Url, "https") {
-							fieldUrl = part.ImageURL.Url
-						} else {
-							fieldUrl = random.StrToMd5(part.ImageURL.Url)
-						}
-						fileOld, err := model.GetFile(fieldUrl)
-						if err != nil || fileOld.Id == 0 {
-							//为空则 重新获取
-							mimeType, fileName, err = image.GetImageFromUrl(part.ImageURL.Url, true)
-							if err != nil {
-								return nil, err
-							}
-						}
-
-						mimeType, fileData, err = FileHandler(c, fieldUrl, part.ImageURL.Url, mimeType, fileName)
+					if ok {
+						mimeType, fileData, err = FileHandler(c, part.ImageURL.Url, part.ImageURL.Url, "", "")
 						if err != nil {
 							return nil, err
 						}
@@ -179,22 +146,58 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 							},
 						})
 					} else {
-						mimeType, fileData, err = image.GetImageFromUrl(part.ImageURL.Url, false)
-						if err != nil {
-							return nil, err
+						// 这里图片统一转为File, 因为base64经常报错
+						// 以下的情形会强制开启图片上传gemini:
+						// 1. 后台统一开启,
+						// 2. chat对话中使用了画图模型, 对话角色=系统的也强制开启, 用户的不管
+						// 3. 用户图片的, 但是第一次请求报错429的, 会改为这种
+						if config.GeminiUploadImageEnabled || (IsImageModel(textRequest.Model) && content.Role != "user") ||
+							(image.GetImageCacheWithGeminiFile(part.ImageURL.Url) != "") {
+							fileName := ""
+							fieldUrl := ""
+							if strings.HasPrefix(part.ImageURL.Url, "http") || strings.HasPrefix(part.ImageURL.Url, "https") {
+								fieldUrl = part.ImageURL.Url
+							} else {
+								fieldUrl = random.StrToMd5(part.ImageURL.Url)
+							}
+							fileOld, err := model.GetFile(fieldUrl)
+							if err != nil || fileOld.Id == 0 {
+								//为空则 重新获取
+								mimeType, fileName, err = image.GetImageFromUrl(part.ImageURL.Url, true)
+								if err != nil {
+									return nil, err
+								}
+							}
+
+							mimeType, fileData, err = FileHandler(c, fieldUrl, part.ImageURL.Url, mimeType, fileName)
+							if err != nil {
+								return nil, err
+							}
+							parts = append(parts, Part{
+								FileData: &FileData{
+									MimeType: mimeType,
+									Uri:      fileData,
+								},
+							})
+						} else {
+							mimeType, fileData, err = image.GetImageFromUrl(part.ImageURL.Url, false)
+							if err != nil {
+								return nil, err
+							}
+							//这里走原始的图片逻辑, 是取b64传给gemini, 保存起来是用于有些prompt请求一直会429, 外层判断429后会改为上面那种方式
+							c.Set("gemini-img-url", part.ImageURL.Url)
+							parts = append(parts, Part{
+								InlineData: &InlineData{
+									MimeType: mimeType,
+									Data:     fileData,
+								},
+							})
 						}
-						//这里走原始的图片逻辑, 是取b64传给gemini, 保存起来是用于有些prompt请求一直会429, 外层判断429后会改为上面那种方式
-						c.Set("gemini-img-url", part.ImageURL.Url)
-						parts = append(parts, Part{
-							InlineData: &InlineData{
-								MimeType: mimeType,
-								Data:     fileData,
-							},
-						})
 					}
 				}
-
 			}
+		} else {
+			return nil, fmt.Errorf("content is empty")
 		}
 		content.Parts = parts
 
@@ -261,8 +264,14 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 		name := random.GetRandomString(10)
 		//需要添加随机字符以减少被gemini识别为自动程序
 		if geminiRequest.Contents[0].Role == "user" {
-			//处理如果存在fileData需要判断
-			if geminiRequest.Contents[0].Parts[0].Text != "" {
+			//处理如果存在fileData或客户端直接传入content=[]需要判断
+			if len(geminiRequest.Contents[0].Parts) == 0 {
+				geminiRequest.Contents[0].Parts = []Part{
+					{
+						Text: fmt.Sprintf("I'm %s, dont say my name", name),
+					},
+				}
+			} else if geminiRequest.Contents[0].Parts[0].Text != "" {
 				geminiRequest.Contents[0].Parts[0].Text = fmt.Sprintf("I'm %s, dont say my name\n%s", name, geminiRequest.Contents[0].Parts[0].Text)
 			} else {
 				geminiRequest.Contents[0].Parts = append([]Part{
