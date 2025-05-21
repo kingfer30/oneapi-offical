@@ -127,3 +127,10 @@ func (a *Adaptor) GetChannelName() string {
 	channelName, _ := GetCompatibleChannelMeta(a.ChannelType)
 	return channelName
 }
+
+func (a *Adaptor) ConvertVideoRequest(request *model.VideoRequest) (any, error) {
+	if request == nil {
+		return nil, errors.New("request is nil")
+	}
+	return request, nil
+}

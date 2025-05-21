@@ -3,11 +3,12 @@ package baidu
 import (
 	"errors"
 	"fmt"
-	"github.com/songquanpeng/one-api/relay/meta"
-	"github.com/songquanpeng/one-api/relay/relaymode"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/songquanpeng/one-api/relay/meta"
+	"github.com/songquanpeng/one-api/relay/relaymode"
 
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/relay/adaptor"
@@ -140,4 +141,11 @@ func (a *Adaptor) GetModelList() []string {
 
 func (a *Adaptor) GetChannelName() string {
 	return "baidu"
+}
+
+func (a *Adaptor) ConvertVideoRequest(request *model.VideoRequest) (any, error) {
+	if request == nil {
+		return nil, errors.New("request is nil")
+	}
+	return request, nil
 }

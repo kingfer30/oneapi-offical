@@ -80,7 +80,7 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 		return nil, errors.New("request is nil")
 	}
 	if request.Thinking {
-		c.Set("hua_thinking", true)
+		c.Set("include_think", true)
 	}
 	switch relayMode {
 	case relaymode.Embeddings:
@@ -306,8 +306,8 @@ func doRequest(c *gin.Context, req *http.Request) (*http.Response, error) {
 }
 
 func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Meta) (usage *model.Usage, err *model.ErrorWithStatusCode) {
-	if c.GetBool("hua_thinking") {
-		meta.Thinking = true
+	if c.GetBool("include_think") {
+		meta.IncludeThinking = true
 	}
 	if !meta.SelfImplement || meta.Mode == relaymode.Embeddings {
 		//标记了流式 走流式输出
@@ -367,4 +367,11 @@ func (a *Adaptor) GetChannelName() string {
 
 func ChatOnline(c *gin.Context, relayMode int, request *model.GeneralOpenAIRequest) {
 
+}
+
+func (a *Adaptor) ConvertVideoRequest(request *model.VideoRequest) (any, error) {
+	if request == nil {
+		return nil, errors.New("request is nil")
+	}
+	return request, nil
 }

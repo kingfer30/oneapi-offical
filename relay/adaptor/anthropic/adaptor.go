@@ -77,3 +77,10 @@ func (a *Adaptor) GetModelList() []string {
 func (a *Adaptor) GetChannelName() string {
 	return "anthropic"
 }
+
+func (a *Adaptor) ConvertVideoRequest(request *model.VideoRequest) (any, error) {
+	if request == nil {
+		return nil, errors.New("request is nil")
+	}
+	return request, nil
+}

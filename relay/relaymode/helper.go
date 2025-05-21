@@ -18,6 +18,8 @@ func GetByPath(path string) int {
 		relayMode = ImagesGenerations
 	} else if strings.HasPrefix(path, "/v1/images/edits") {
 		relayMode = ImagesEdit
+	} else if strings.HasPrefix(path, "/v1/video/generations") {
+		relayMode = VideoGenerations
 	} else if strings.HasPrefix(path, "/v1/edits") {
 		relayMode = Edits
 	} else if strings.HasPrefix(path, "/v1/audio/speech") {

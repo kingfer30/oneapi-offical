@@ -26,6 +26,8 @@ import (
 func relayHelper(c *gin.Context, relayMode int) *model.ErrorWithStatusCode {
 	var err *model.ErrorWithStatusCode
 	switch relayMode {
+	case relaymode.VideoGenerations:
+		err = controller.RelayImageHelper(c, relayMode)
 	case relaymode.ImagesGenerations:
 		err = controller.RelayImageHelper(c, relayMode)
 	case relaymode.ImagesEdit:

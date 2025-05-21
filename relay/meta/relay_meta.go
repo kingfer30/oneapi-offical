@@ -33,7 +33,7 @@ type Meta struct {
 	RequestURLPath  string
 	PromptTokens    int // only for DoResponse
 	SystemPrompt    string
-	Thinking        bool
+	IncludeThinking        bool
 	EndThinking     bool
 	UseThinking     bool
 	SelfImplement   bool

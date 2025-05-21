@@ -73,7 +73,6 @@ type ChatContent struct {
 	Role  string `json:"role,omitempty"`
 	Parts []Part `json:"parts"`
 }
-
 type ChatSafetySettings struct {
 	Category  string `json:"category"`
 	Threshold string `json:"threshold"`
@@ -101,7 +100,8 @@ type ChatGenerationConfig struct {
 	ThinkingConfig     *ThinkingConfig `json:"thinkingConfig,omitempty"`
 }
 type ThinkingConfig struct {
-	ThinkingBudget *int `json:"thinkingBudget,omitempty"`
+	ThinkingBudget  *int `json:"thinkingBudget,omitempty"`
+	IncludeThoughts bool `json:"includeThoughts,omitempty"`
 }
 
 type ChatCandidate struct {
@@ -164,4 +164,43 @@ type ImageResponse2ChatContent struct {
 type ImageResponse2ChatImageUrl struct {
 	Url    string `json:"url,omitempty"`
 	Detail string `json:"detail,omitempty"`
+}
+
+type VideoRequest struct {
+	Instances  VideoInstances  `json:"instances"`
+	Parameters VideoParameters `json:"parameters,omitempty"`
+}
+type VideoInstances struct {
+	Prompt string     `json:"prompt"`
+	Image  VideoImage `json:"image"`
+}
+
+type VideoImage struct {
+	BytesBase64Encoded string `json:"bytesBase64Encoded"`
+	GcsUri             string `json:"gcsUri"`
+}
+
+type VideoParameters struct {
+	SampleCount      int           `json:"sampleCount"`
+	Seed             int           `json:"seed,omitempty"`
+	EnhancePrompt    bool          `json:"enhancePrompt,omitempty"`
+	NegativePrompt   string        `json:"negativePrompt,omitempty"`
+	AspectRatio      string        `json:"aspectRatio,omitempty"`
+	OutputOptions    OutputOptions `json:"outputOptions,omitempty"`
+	SampleImageStyle string        `json:"sampleImageStyle,omitempty"`
+	PersonGeneration string        `json:"personGeneration,omitempty"`
+	SafetySetting    string        `json:"safetySetting,omitempty"`
+	AddWatermark     bool          `json:"addWatermark,omitempty"`
+	StorageUri       string        `json:"storageUri,omitempty"`
+	DurationSeconds  int           `json:"durationSeconds,omitempty"`
+	Mode             string        `json:"mode,omitempty"`
+	UpscaleConfig    UpscaleConfig `json:"upscaleConfig,omitempty"`
+}
+type UpscaleConfig struct {
+	UpscaleFactor string `json:"upscaleFactor"`
+}
+
+type OutputOptions struct {
+	MimeType           string `json:"mimeType,omitempty"`
+	CompressionQuality int    `json:"compressionQuality,omitempty"`
 }
