@@ -331,7 +331,7 @@ func handleGenaiStream(c *gin.Context, meta *meta.Meta, iter *genai.GenerateCont
 			if cand.Content != nil {
 				for index, part := range cand.Content.Parts {
 					text := fmt.Sprint(part)
-					if strings.Contains(meta.ActualModelName, "think") && meta.Thinking {
+					if meta.IncludeThinking {
 						//thinkingStart:\n%s\nthinkingEnd\n%s
 						if index >= 1 {
 							currentText := "thinkingStart\n" + text
@@ -421,7 +421,7 @@ func handleGenaiUnStream(c *gin.Context, meta *meta.Meta, resp *genai.GenerateCo
 			} else {
 				for i, item := range candidate.Content.Parts {
 					currentText := fmt.Sprint(item)
-					if strings.Contains(meta.ActualModelName, "think") && meta.Thinking {
+					if meta.IncludeThinking {
 						if i == 0 {
 							fullText = fmt.Sprintf("thinkingStart:\n%s", currentText)
 						} else {

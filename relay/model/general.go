@@ -75,7 +75,7 @@ type GeneralOpenAIRequest struct {
 	// Others
 	Instruction    string `json:"instruction,omitempty"`
 	NumCtx         int    `json:"num_ctx,omitempty"`
-	Thinking       bool   `json:"thinking,omitempty"`
+	Thinking       *bool   `json:"thinking,omitempty"`
 	ThinkingBudget *int   `json:"thinking_budget,omitempty"`
 }
 

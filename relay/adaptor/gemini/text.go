@@ -54,6 +54,22 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 			ThinkingBudget: textRequest.ThinkingBudget,
 		}
 	}
+	if IsThinkingModel(textRequest.Model) {
+		isThink := true
+		if textRequest.Thinking != nil && *textRequest.Thinking {
+			c.Set("include_think", true)
+		} else if textRequest.Thinking != nil && *textRequest.Thinking == false {
+			isThink = false
+		}
+		if generationConfig.ThinkingConfig != nil {
+			generationConfig.ThinkingConfig.IncludeThoughts = isThink
+		} else {
+			generationConfig.ThinkingConfig = &ThinkingConfig{
+				IncludeThoughts: isThink,
+			}
+		}
+	}
+
 	geminiRequest := ChatRequest{
 		Contents:         make([]ChatContent, 0, len(textRequest.Messages)),
 		GenerationConfig: generationConfig,
@@ -314,25 +330,18 @@ func (g *ChatResponse) GetResponseText(meta *meta.Meta) string {
 		return ""
 	}
 	if len(g.Candidates) > 0 && len(g.Candidates[0].Content.Parts) > 0 {
-		if strings.Contains(meta.ActualModelName, "think") && meta.Thinking {
+		if meta.IncludeThinking {
 			//thinkingStart:\n%s\nthinkingEnd\n%s
-			if len(g.Candidates[0].Content.Parts) > 1 {
+			if g.Candidates[0].Content.Parts[0].Thought {
 				think := "thinkingStart\n" + g.Candidates[0].Content.Parts[0].Text
 				think += "\nthinkingEnd\n"
-				think += g.Candidates[0].Content.Parts[1].Text
-				meta.EndThinking = true
 				return think
 			}
-			if meta.EndThinking {
-				return g.Candidates[0].Content.Parts[0].Text
-			} else {
-				return fmt.Sprintf("thinkingStart\n%s\nthinkingEnd\n", g.Candidates[0].Content.Parts[0].Text)
-			}
+			return g.Candidates[0].Content.Parts[0].Text
 		} else {
-			if len(g.Candidates[0].Content.Parts) > 1 {
+			if g.Candidates[0].Content.Parts[0].Thought {
 				think := g.Candidates[0].Content.Parts[0].Text
 				think += "\n"
-				think += g.Candidates[0].Content.Parts[1].Text
 				return think
 			}
 			return g.Candidates[0].Content.Parts[0].Text
@@ -385,18 +394,18 @@ func responseGeminiChat2OpenAI(response *ChatResponse, meta *meta.Meta) *openai.
 			if candidate.Content.Parts[0].FunctionCall != nil {
 				choice.Message.ToolCalls = getToolCalls(&candidate)
 			} else {
-				for i, item := range candidate.Content.Parts {
+				for _, item := range candidate.Content.Parts {
 					if item.InlineData != nil {
 						choice.Message.Content = fmt.Sprintf("%s\ndata:%s;base64,%s", choice.Message.Content, item.InlineData.MimeType, item.InlineData.Data)
 					} else {
-						if strings.Contains(meta.ActualModelName, "think") && meta.Thinking {
-							if i == 0 {
+						if meta.IncludeThinking {
+							if item.Thought {
 								choice.Message.Content = fmt.Sprintf("thinkingStart:\n%s", item.Text)
 							} else {
 								choice.Message.Content = fmt.Sprintf("%s\nthinkingEnd\n%s", choice.Message.Content, item.Text)
 							}
 						} else {
-							if i == 0 {
+							if item.Thought {
 								choice.Message.Content = item.Text
 							} else {
 								choice.Message.Content = fmt.Sprintf("%s\n%s", choice.Message.Content, item.Text)
@@ -422,7 +431,7 @@ func streamResponseGeminiChat2OpenAI(geminiResponse *ChatResponse, meta *meta.Me
 	response.Id = fmt.Sprintf("chatcmpl-%s", random.GetUUID())
 	response.Created = helper.GetTimestamp()
 	response.Object = "chat.completion.chunk"
-	response.Model = "gemini"
+	response.Model = meta.ActualModelName
 	response.Choices = []openai.ChatCompletionsStreamResponseChoice{choice}
 	return &response
 }
