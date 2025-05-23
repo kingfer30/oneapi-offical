@@ -39,6 +39,8 @@ var AwsModelIDMap = map[string]string{
 	"claude-3-5-haiku-20241022":  "anthropic.claude-3-5-haiku-20241022-v1:0",
 	"claude-3-7-sonnet-20250219": "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
 	"claude-3-7-sonnet-latest":   "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+	"claude-sonnet-4-20250514":   "us.anthropic.claude-sonnet-4-20250514-v1:0",
+	"claude-opus-4-20250514":     "us.anthropic.claude-opus-4-20250514-v1:0",
 }
 
 func awsModelID(requestModel string) (string, error) {
