@@ -30,7 +30,9 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	if request == nil {
 		return nil, errors.New("request is nil")
 	}
-
+	if request.Thinking != nil && request.Thinking.Type == "enabled" && request.Thinking.IncludeThinking {
+		c.Set("include_think", true)
+	}
 	claudeReq := anthropic.ConvertRequest(*request)
 	req := Request{
 		AnthropicVersion: anthropicVersion,
@@ -51,6 +53,9 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 }
 
 func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Meta) (usage *model.Usage, err *model.ErrorWithStatusCode) {
+	if c.GetBool("include_think") {
+		meta.IncludeThinking = true
+	}
 	if meta.IsStream {
 		err, usage = anthropic.StreamHandler(c, resp, meta)
 	} else {

@@ -64,10 +64,10 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *Request {
 		Stream:      textRequest.Stream,
 		Tools:       claudeTools,
 	}
-	if textRequest.Thinking != nil && *textRequest.Thinking {
+	if textRequest.Thinking != nil && textRequest.Thinking.Type == "enabled" {
 		token := 1024
-		if textRequest.ThinkingBudget != nil && *textRequest.ThinkingBudget > 0 {
-			token = *textRequest.ThinkingBudget
+		if textRequest.Thinking.ThinkingBudget > 0 {
+			token = textRequest.Thinking.ThinkingBudget
 		}
 		claudeRequest.Thinking = &Thinking{
 			Type:         "enabled",
@@ -250,7 +250,7 @@ func StreamResponseClaude2OpenAI(claudeResponse *StreamResponse, meta *meta.Meta
 	var choice openai.ChatCompletionsStreamResponseChoice
 	if !meta.IncludeThinking {
 		choice.Delta.Content = responseText
-		choice.Delta.ReasonContent = &reasoningContent
+		choice.Delta.ReasoningContent = &reasoningContent
 	} else {
 		if reasoningContent != "" {
 			choice.Delta.Content = &reasoningContent
@@ -275,14 +275,14 @@ func StreamResponseClaude2OpenAI(claudeResponse *StreamResponse, meta *meta.Meta
 
 func ResponseClaude2OpenAI(claudeResponse *Response, meta *meta.Meta) *openai.TextResponse {
 	var responseText string
-	reasonContent := ""
+	ReasoningContent := ""
 	if len(claudeResponse.Content) > 0 {
 		for _, item := range claudeResponse.Content {
 			if responseText != "" {
 				responseText += "\n"
 			}
 			if item.Type == "thinking" {
-				reasonContent = item.Thinking
+				ReasoningContent = item.Thinking
 				if meta.IncludeThinking {
 					responseText = fmt.Sprintf("%s%s", responseText, item.Thinking)
 				}
@@ -311,8 +311,8 @@ func ResponseClaude2OpenAI(claudeResponse *Response, meta *meta.Meta) *openai.Te
 		Name:      nil,
 		ToolCalls: tools,
 	}
-	if reasonContent != "" && !meta.IncludeThinking {
-		msg.ReasonContent = &reasonContent
+	if ReasoningContent != "" && !meta.IncludeThinking {
+		msg.ReasoningContent = &ReasoningContent
 	}
 	choice := openai.TextResponseChoice{
 		Index:        0,

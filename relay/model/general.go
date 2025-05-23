@@ -31,6 +31,12 @@ type StreamOptions struct {
 	IncludeUsage bool `json:"include_usage,omitempty"`
 }
 
+type Thinking struct {
+	Type            string `json:"type"`
+	ThinkingBudget  int    `json:"thinking_budget,omitempty"`
+	IncludeThinking bool   `json:"include_thinking,omitempty"`
+}
+
 type GeneralOpenAIRequest struct {
 	// https://platform.openai.com/docs/api-reference/chat/create
 	Messages            []Message       `json:"messages,omitempty"`
@@ -73,11 +79,9 @@ type GeneralOpenAIRequest struct {
 	Size    string  `json:"size,omitempty"`
 	Style   *string `json:"style,omitempty"`
 	// Others
-	Instruction     string `json:"instruction,omitempty"`
-	NumCtx          int    `json:"num_ctx,omitempty"`
-	Thinking        *bool  `json:"thinking,omitempty"`
-	IncludeThinking *bool  `json:"include_thinking,omitempty"`
-	ThinkingBudget  *int   `json:"thinking_budget,omitempty"`
+	Instruction string    `json:"instruction,omitempty"`
+	NumCtx      int       `json:"num_ctx,omitempty"`
+	Thinking    *Thinking `json:"thinking,omitempty"`
 }
 
 func (r GeneralOpenAIRequest) ParseInput() []string {

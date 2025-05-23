@@ -49,27 +49,19 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 	if IsImageModel(textRequest.Model) {
 		generationConfig.ResponseModalities = []string{"text", "image"}
 	}
-	if textRequest.ThinkingBudget != nil {
-		generationConfig.ThinkingConfig = &ThinkingConfig{
-			ThinkingBudget: textRequest.ThinkingBudget,
-		}
-	}
 	if IsThinkingModel(textRequest.Model) {
-		isThink := true
-		if textRequest.Thinking != nil && *textRequest.Thinking {
-			c.Set("include_think", true)
-		} else if textRequest.Thinking != nil && *textRequest.Thinking == false {
-			isThink = false
+		thinkingConfig := &ThinkingConfig{
+			IncludeThoughts: true,
 		}
-		if generationConfig.ThinkingConfig != nil {
-			generationConfig.ThinkingConfig.IncludeThoughts = isThink
-		} else {
-			generationConfig.ThinkingConfig = &ThinkingConfig{
-				IncludeThoughts: isThink,
+		if textRequest.Thinking != nil && textRequest.Thinking.Type == "enabled" {
+			if textRequest.Thinking.ThinkingBudget > 0 {
+				thinkingConfig.ThinkingBudget = &textRequest.Thinking.ThinkingBudget
 			}
+		} else if textRequest.Thinking != nil && textRequest.Thinking.Type != "enabled" {
+			thinkingConfig.IncludeThoughts = false
 		}
+		generationConfig.ThinkingConfig = thinkingConfig
 	}
-
 	geminiRequest := ChatRequest{
 		Contents:         make([]ChatContent, 0, len(textRequest.Messages)),
 		GenerationConfig: generationConfig,
@@ -325,29 +317,25 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 	return &geminiRequest, nil
 }
 
-func (g *ChatResponse) GetResponseText(meta *meta.Meta) string {
+func (g *ChatResponse) GetResponseText(meta *meta.Meta) (string, string) {
 	if g == nil {
-		return ""
+		return "", ""
 	}
+	var reasoningContent string
+	var responseText string
 	if len(g.Candidates) > 0 && len(g.Candidates[0].Content.Parts) > 0 {
-		if meta.IncludeThinking {
-			//thinkingStart:\n%s\nthinkingEnd\n%s
-			if g.Candidates[0].Content.Parts[0].Thought {
-				think := "thinkingStart\n" + g.Candidates[0].Content.Parts[0].Text
-				think += "\nthinkingEnd\n"
-				return think
-			}
-			return g.Candidates[0].Content.Parts[0].Text
+		if g.Candidates[0].Content.Parts[0].Thought {
+			reasoningContent = g.Candidates[0].Content.Parts[0].Text
 		} else {
-			if g.Candidates[0].Content.Parts[0].Thought {
-				think := g.Candidates[0].Content.Parts[0].Text
-				think += "\n"
-				return think
-			}
-			return g.Candidates[0].Content.Parts[0].Text
+			responseText = g.Candidates[0].Content.Parts[0].Text
 		}
+		if meta.IncludeThinking {
+			responseText = fmt.Sprintf("%s\n%s", reasoningContent, responseText)
+			reasoningContent = ""
+		}
+		return responseText, reasoningContent
 	}
-	return ""
+	return "", ""
 }
 
 func getToolCalls(candidate *ChatCandidate) []relaymodel.Tool {
@@ -381,6 +369,8 @@ func responseGeminiChat2OpenAI(response *ChatResponse, meta *meta.Meta) *openai.
 		Created: helper.GetTimestamp(),
 		Choices: make([]openai.TextResponseChoice, 0, len(response.Candidates)),
 	}
+	var reasoningContent string
+	var responseText string
 	for i, candidate := range response.Candidates {
 		choice := openai.TextResponseChoice{
 			Index: i,
@@ -396,22 +386,20 @@ func responseGeminiChat2OpenAI(response *ChatResponse, meta *meta.Meta) *openai.
 			} else {
 				for _, item := range candidate.Content.Parts {
 					if item.InlineData != nil {
-						choice.Message.Content = fmt.Sprintf("%s\ndata:%s;base64,%s", choice.Message.Content, item.InlineData.MimeType, item.InlineData.Data)
+						responseText = fmt.Sprintf("%s\ndata:%s;base64,%s", responseText, item.InlineData.MimeType, item.InlineData.Data)
 					} else {
-						if meta.IncludeThinking {
-							if item.Thought {
-								choice.Message.Content = fmt.Sprintf("thinkingStart:\n%s", item.Text)
-							} else {
-								choice.Message.Content = fmt.Sprintf("%s\nthinkingEnd\n%s", choice.Message.Content, item.Text)
-							}
+						if item.Thought {
+							reasoningContent = item.Text
 						} else {
-							if item.Thought {
-								choice.Message.Content = item.Text
-							} else {
-								choice.Message.Content = fmt.Sprintf("%s\n%s", choice.Message.Content, item.Text)
-							}
+							responseText = fmt.Sprintf("%s%s", responseText, item.Text)
 						}
 					}
+				}
+				if meta.IncludeThinking {
+					choice.Message.Content = fmt.Sprintf("%s\n%s", reasoningContent, responseText)
+				} else {
+					choice.Message.Content = responseText
+					choice.Message.ReasoningContent = &reasoningContent
 				}
 			}
 		} else {
@@ -425,8 +413,9 @@ func responseGeminiChat2OpenAI(response *ChatResponse, meta *meta.Meta) *openai.
 
 func streamResponseGeminiChat2OpenAI(geminiResponse *ChatResponse, meta *meta.Meta) *openai.ChatCompletionsStreamResponse {
 	var choice openai.ChatCompletionsStreamResponseChoice
-	choice.Delta.Content = geminiResponse.GetResponseText(meta)
-	//choice.FinishReason = &constant.StopFinishReason
+	responseText, reasoningContent := geminiResponse.GetResponseText(meta)
+	choice.Delta.Content = responseText
+	choice.Delta.ReasoningContent = &reasoningContent
 	var response openai.ChatCompletionsStreamResponse
 	response.Id = fmt.Sprintf("chatcmpl-%s", random.GetUUID())
 	response.Created = helper.GetTimestamp()
@@ -591,7 +580,8 @@ func Handler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relaymodel.
 			TotalTokens:      quota,
 		}
 	} else {
-		completionTokens := openai.CountTokenText(geminiResponse.GetResponseText(meta), meta.ActualModelName)
+		responseText, reasoningContent := geminiResponse.GetResponseText(meta)
+		completionTokens := openai.CountTokenText((responseText + reasoningContent), meta.ActualModelName)
 		usage = relaymodel.Usage{
 			PromptTokens:     meta.PromptTokens,
 			CompletionTokens: completionTokens,
@@ -617,10 +607,18 @@ func ChangeChat2TxtRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIR
 		MaxOutputTokens: textRequest.MaxTokens,
 		StopSequences:   textRequest.Stop,
 	}
-	if textRequest.ThinkingBudget != nil {
-		generationConfig.ThinkingConfig = &ThinkingConfig{
-			ThinkingBudget: textRequest.ThinkingBudget,
+	if IsThinkingModel(textRequest.Model) {
+		thinkingConfig := &ThinkingConfig{
+			IncludeThoughts: true,
 		}
+		if textRequest.Thinking != nil && textRequest.Thinking.Type == "enabled" {
+			if textRequest.Thinking.ThinkingBudget > 0 {
+				thinkingConfig.ThinkingBudget = &textRequest.Thinking.ThinkingBudget
+			}
+		} else if textRequest.Thinking != nil && textRequest.Thinking.Type != "enabled" {
+			thinkingConfig.IncludeThoughts = false
+		}
+		generationConfig.ThinkingConfig = thinkingConfig
 	}
 	geminiRequest := ChatRequest{
 		Contents:         make([]ChatContent, 0),
