@@ -86,7 +86,6 @@ func Handler(c *gin.Context, awsCli *bedrockruntime.Client, meta *meta.Meta) (*r
 		return utils.WrapErr(errors.Wrap(err, "InvokeModel")), nil
 	}
 
-	logger.SysLogf("body: %s", string(awsResp.Body))
 	claudeResponse := new(anthropic.Response)
 	err = json.Unmarshal(awsResp.Body, claudeResponse)
 	if err != nil {
@@ -163,7 +162,6 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client, meta *meta.Met
 				logger.SysError("error unmarshalling stream response: " + err.Error())
 				return false
 			}
-			logger.SysLogf("body:%s", string(v.Value.Bytes))
 			response, meta := anthropic.StreamResponseClaude2OpenAI(claudeResp, meta)
 			if meta != nil {
 				usage.PromptTokens += meta.Usage.InputTokens
