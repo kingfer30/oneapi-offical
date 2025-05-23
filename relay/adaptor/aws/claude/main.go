@@ -22,6 +22,7 @@ import (
 	"github.com/songquanpeng/one-api/relay/adaptor/anthropic"
 	"github.com/songquanpeng/one-api/relay/adaptor/aws/utils"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
+	"github.com/songquanpeng/one-api/relay/meta"
 	relaymodel "github.com/songquanpeng/one-api/relay/model"
 )
 
@@ -51,7 +52,7 @@ func awsModelID(requestModel string) (string, error) {
 	return "", errors.Errorf("model %s not found", requestModel)
 }
 
-func Handler(c *gin.Context, awsCli *bedrockruntime.Client, modelName string) (*relaymodel.ErrorWithStatusCode, *relaymodel.Usage) {
+func Handler(c *gin.Context, awsCli *bedrockruntime.Client, meta *meta.Meta) (*relaymodel.ErrorWithStatusCode, *relaymodel.Usage) {
 	awsModelId, err := awsModelID(c.GetString(ctxkey.RequestModel))
 	if err != nil {
 		return utils.WrapErr(errors.Wrap(err, "awsModelID")), nil
@@ -85,14 +86,15 @@ func Handler(c *gin.Context, awsCli *bedrockruntime.Client, modelName string) (*
 		return utils.WrapErr(errors.Wrap(err, "InvokeModel")), nil
 	}
 
+	logger.SysLogf("body: %s", string(awsResp.Body))
 	claudeResponse := new(anthropic.Response)
 	err = json.Unmarshal(awsResp.Body, claudeResponse)
 	if err != nil {
 		return utils.WrapErr(errors.Wrap(err, "unmarshal response")), nil
 	}
 
-	openaiResp := anthropic.ResponseClaude2OpenAI(claudeResponse)
-	openaiResp.Model = modelName
+	openaiResp := anthropic.ResponseClaude2OpenAI(claudeResponse, meta)
+	openaiResp.Model = meta.ActualModelName
 	usage := relaymodel.Usage{
 		PromptTokens:     claudeResponse.Usage.InputTokens,
 		CompletionTokens: claudeResponse.Usage.OutputTokens,
@@ -104,7 +106,7 @@ func Handler(c *gin.Context, awsCli *bedrockruntime.Client, modelName string) (*
 	return nil, &usage
 }
 
-func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.ErrorWithStatusCode, *relaymodel.Usage) {
+func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client, meta *meta.Meta) (*relaymodel.ErrorWithStatusCode, *relaymodel.Usage) {
 	createdTime := helper.GetTimestamp()
 	awsModelId, err := awsModelID(c.GetString(ctxkey.RequestModel))
 	if err != nil {
@@ -161,8 +163,8 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 				logger.SysError("error unmarshalling stream response: " + err.Error())
 				return false
 			}
-
-			response, meta := anthropic.StreamResponseClaude2OpenAI(claudeResp)
+			logger.SysLogf("body:%s", string(v.Value.Bytes))
+			response, meta := anthropic.StreamResponseClaude2OpenAI(claudeResp, meta)
 			if meta != nil {
 				usage.PromptTokens += meta.Usage.InputTokens
 				usage.CompletionTokens += meta.Usage.OutputTokens

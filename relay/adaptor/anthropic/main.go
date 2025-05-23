@@ -16,6 +16,7 @@ import (
 	"github.com/songquanpeng/one-api/common/image"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
+	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
 )
 
@@ -62,6 +63,16 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *Request {
 		TopK:        textRequest.TopK,
 		Stream:      textRequest.Stream,
 		Tools:       claudeTools,
+	}
+	if textRequest.Thinking != nil && *textRequest.Thinking {
+		token := 1024
+		if textRequest.ThinkingBudget != nil && *textRequest.ThinkingBudget > 0 {
+			token = *textRequest.ThinkingBudget
+		}
+		claudeRequest.Thinking = &Thinking{
+			Type:         "enabled",
+			BudgetTokens: token,
+		}
 	}
 	if len(claudeTools) > 0 {
 		claudeToolChoice := struct {
@@ -185,10 +196,11 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *Request {
 }
 
 // https://docs.anthropic.com/claude/reference/messages-streaming
-func StreamResponseClaude2OpenAI(claudeResponse *StreamResponse) (*openai.ChatCompletionsStreamResponse, *Response) {
+func StreamResponseClaude2OpenAI(claudeResponse *StreamResponse, meta *meta.Meta) (*openai.ChatCompletionsStreamResponse, *Response) {
 	var response *Response
 	var responseText string
 	var stopReason string
+	var reasoningContent string
 	tools := make([]model.Tool, 0)
 
 	switch claudeResponse.Type {
@@ -211,12 +223,18 @@ func StreamResponseClaude2OpenAI(claudeResponse *StreamResponse) (*openai.ChatCo
 	case "content_block_delta":
 		if claudeResponse.Delta != nil {
 			responseText = claudeResponse.Delta.Text
-			if claudeResponse.Delta.Type == "input_json_delta" {
+			switch claudeResponse.Delta.Type {
+			case "input_json_delta":
 				tools = append(tools, model.Tool{
 					Function: model.Function{
 						Arguments: claudeResponse.Delta.PartialJson,
 					},
 				})
+			case "signature_delta":
+				// 加密的不处理
+				reasoningContent = "\n"
+			case "thinking_delta":
+				reasoningContent = claudeResponse.Delta.Thinking
 			}
 		}
 	case "message_delta":
@@ -230,7 +248,16 @@ func StreamResponseClaude2OpenAI(claudeResponse *StreamResponse) (*openai.ChatCo
 		}
 	}
 	var choice openai.ChatCompletionsStreamResponseChoice
-	choice.Delta.Content = responseText
+	if !meta.IncludeThinking {
+		choice.Delta.Content = responseText
+		choice.Delta.ReasonContent = &reasoningContent
+	} else {
+		if reasoningContent != "" {
+			choice.Delta.Content = &reasoningContent
+		} else {
+			choice.Delta.Content = responseText
+		}
+	}
 	if len(tools) > 0 {
 		choice.Delta.Content = nil // compatible with other OpenAI derivative applications, like LobeOpenAICompatibleFactory ...
 		choice.Delta.ToolCalls = tools
@@ -246,10 +273,23 @@ func StreamResponseClaude2OpenAI(claudeResponse *StreamResponse) (*openai.ChatCo
 	return &openaiResponse, response
 }
 
-func ResponseClaude2OpenAI(claudeResponse *Response) *openai.TextResponse {
+func ResponseClaude2OpenAI(claudeResponse *Response, meta *meta.Meta) *openai.TextResponse {
 	var responseText string
+	reasonContent := ""
 	if len(claudeResponse.Content) > 0 {
-		responseText = claudeResponse.Content[0].Text
+		for _, item := range claudeResponse.Content {
+			if responseText != "" {
+				responseText += "\n"
+			}
+			if item.Type == "thinking" {
+				reasonContent = item.Thinking
+				if meta.IncludeThinking {
+					responseText = fmt.Sprintf("%s%s", responseText, item.Thinking)
+				}
+			} else {
+				responseText = fmt.Sprintf("%s%s", responseText, item.Text)
+			}
+		}
 	}
 	tools := make([]model.Tool, 0)
 	for _, v := range claudeResponse.Content {
@@ -265,14 +305,18 @@ func ResponseClaude2OpenAI(claudeResponse *Response) *openai.TextResponse {
 			})
 		}
 	}
+	msg := model.Message{
+		Role:      "assistant",
+		Content:   responseText,
+		Name:      nil,
+		ToolCalls: tools,
+	}
+	if reasonContent != "" && !meta.IncludeThinking {
+		msg.ReasonContent = &reasonContent
+	}
 	choice := openai.TextResponseChoice{
-		Index: 0,
-		Message: model.Message{
-			Role:      "assistant",
-			Content:   responseText,
-			Name:      nil,
-			ToolCalls: tools,
-		},
+		Index:        0,
+		Message:      msg,
 		FinishReason: stopReasonClaude2OpenAI(claudeResponse.StopReason),
 	}
 	fullTextResponse := openai.TextResponse{
@@ -285,7 +329,7 @@ func ResponseClaude2OpenAI(claudeResponse *Response) *openai.TextResponse {
 	return &fullTextResponse
 }
 
-func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCode, *model.Usage) {
+func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model.ErrorWithStatusCode, *model.Usage) {
 	createdTime := helper.GetTimestamp()
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -323,7 +367,7 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 			continue
 		}
 
-		response, meta := StreamResponseClaude2OpenAI(&claudeResponse)
+		response, meta := StreamResponseClaude2OpenAI(&claudeResponse, meta)
 		if meta != nil {
 			usage.PromptTokens += meta.Usage.InputTokens
 			usage.CompletionTokens += meta.Usage.OutputTokens
@@ -374,7 +418,7 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 	return nil, &usage
 }
 
-func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName string) (*model.ErrorWithStatusCode, *model.Usage) {
+func Handler(c *gin.Context, resp *http.Response, promptTokens int, meta *meta.Meta) (*model.ErrorWithStatusCode, *model.Usage) {
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return openai.ErrorWrapper(err, "read_response_body_failed", http.StatusInternalServerError), nil
@@ -399,8 +443,8 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 			StatusCode: resp.StatusCode,
 		}, nil
 	}
-	fullTextResponse := ResponseClaude2OpenAI(&claudeResponse)
-	fullTextResponse.Model = modelName
+	fullTextResponse := ResponseClaude2OpenAI(&claudeResponse, meta)
+	fullTextResponse.Model = meta.ActualModelName
 	usage := model.Usage{
 		PromptTokens:     claudeResponse.Usage.InputTokens,
 		CompletionTokens: claudeResponse.Usage.OutputTokens,

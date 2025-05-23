@@ -47,6 +47,9 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	if request == nil {
 		return nil, errors.New("request is nil")
 	}
+	if request.Thinking != nil && *request.Thinking && request.IncludeThinking != nil && *request.IncludeThinking {
+		c.Set("include_think", true)
+	}
 	return ConvertRequest(*request), nil
 }
 
@@ -62,10 +65,13 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 }
 
 func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Meta) (usage *model.Usage, err *model.ErrorWithStatusCode) {
+	if c.GetBool("include_think") {
+		meta.IncludeThinking = true
+	}
 	if meta.IsStream {
-		err, usage = StreamHandler(c, resp)
+		err, usage = StreamHandler(c, resp, meta)
 	} else {
-		err, usage = Handler(c, resp, meta.PromptTokens, meta.ActualModelName)
+		err, usage = Handler(c, resp, meta.PromptTokens, meta)
 	}
 	return
 }

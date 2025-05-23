@@ -20,7 +20,9 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	if request == nil {
 		return nil, errors.New("request is nil")
 	}
-
+	if request.Thinking != nil && *request.Thinking && request.IncludeThinking != nil && *request.IncludeThinking {
+		c.Set("include_think", true)
+	}
 	claudeReq := anthropic.ConvertRequest(*request)
 	c.Set(ctxkey.RequestModel, request.Model)
 	c.Set(ctxkey.ConvertedRequest, claudeReq)
@@ -28,10 +30,13 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 }
 
 func (a *Adaptor) DoResponse(c *gin.Context, awsCli *bedrockruntime.Client, meta *meta.Meta) (usage *model.Usage, err *model.ErrorWithStatusCode) {
+	if c.GetBool("include_think") {
+		meta.IncludeThinking = true
+	}
 	if meta.IsStream {
-		err, usage = StreamHandler(c, awsCli)
+		err, usage = StreamHandler(c, awsCli, meta)
 	} else {
-		err, usage = Handler(c, awsCli, meta.ActualModelName)
+		err, usage = Handler(c, awsCli, meta)
 	}
 	return
 }

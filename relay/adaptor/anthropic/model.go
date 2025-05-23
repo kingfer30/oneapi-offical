@@ -13,9 +13,10 @@ type ImageSource struct {
 }
 
 type Content struct {
-	Type   string       `json:"type"`
-	Text   string       `json:"text,omitempty"`
-	Source *ImageSource `json:"source,omitempty"`
+	Type     string       `json:"type"`
+	Thinking string       `json:"thinking,omitempty"`
+	Text     string       `json:"text,omitempty"`
+	Source   *ImageSource `json:"source,omitempty"`
 	// tool_calls
 	Id        string `json:"id,omitempty"`
 	Name      string `json:"name,omitempty"`
@@ -53,7 +54,13 @@ type Request struct {
 	TopK          int       `json:"top_k,omitempty"`
 	Tools         []Tool    `json:"tools,omitempty"`
 	ToolChoice    any       `json:"tool_choice,omitempty"`
+	Thinking      *Thinking `json:"thinking,omitempty"`
 	//Metadata    `json:"metadata,omitempty"`
+}
+
+type Thinking struct {
+	BudgetTokens int    `json:"budget_tokens,omitempty"`
+	Type         string `json:"type,omitempty"`
 }
 
 type Usage struct {
@@ -81,6 +88,7 @@ type Response struct {
 type Delta struct {
 	Type         string  `json:"type"`
 	Text         string  `json:"text"`
+	Thinking     string  `json:"thinking,omitempty"`
 	PartialJson  string  `json:"partial_json,omitempty"`
 	StopReason   *string `json:"stop_reason"`
 	StopSequence *string `json:"stop_sequence"`

@@ -52,9 +52,9 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 
 func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Meta) (usage *model.Usage, err *model.ErrorWithStatusCode) {
 	if meta.IsStream {
-		err, usage = anthropic.StreamHandler(c, resp)
+		err, usage = anthropic.StreamHandler(c, resp, meta)
 	} else {
-		err, usage = anthropic.Handler(c, resp, meta.PromptTokens, meta.ActualModelName)
+		err, usage = anthropic.Handler(c, resp, meta.PromptTokens, meta)
 	}
 	return
 }
