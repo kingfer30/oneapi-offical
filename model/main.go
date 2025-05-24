@@ -167,6 +167,9 @@ func migrateDB() error {
 	if err = DB.AutoMigrate(&Group{}); err != nil {
 		return err
 	}
+	if err = DB.AutoMigrate(&Model{}); err != nil {
+		return err
+	}
 	return nil
 }
 

@@ -5,11 +5,12 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
-	"github.com/songquanpeng/one-api/common/config"
 	"net"
 	"net/smtp"
 	"strings"
 	"time"
+
+	"github.com/songquanpeng/one-api/common/config"
 )
 
 func shouldAuth() bool {
@@ -19,6 +20,9 @@ func shouldAuth() bool {
 func SendEmail(subject string, receiver string, content string) error {
 	if receiver == "" {
 		return fmt.Errorf("receiver is empty")
+	}
+	if config.SMTPServer == "" {
+		return fmt.Errorf("SMTPServer is empty")
 	}
 	if config.SMTPFrom == "" { // for compatibility
 		config.SMTPFrom = config.SMTPAccount
