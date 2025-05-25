@@ -32,9 +32,15 @@ type StreamOptions struct {
 }
 
 type Thinking struct {
-	Type            string `json:"type"`
-	ThinkingBudget  int    `json:"thinking_budget,omitempty"`
-	IncludeThinking bool   `json:"include_thinking,omitempty"`
+	Type            string       `json:"type"`
+	ThinkingBudget  int          `json:"thinking_budget,omitempty"`
+	IncludeThinking bool         `json:"include_thinking,omitempty"`
+	ThinkingTag     *ThinkingTag `json:"thinking_tag,omitempty"`
+}
+type ThinkingTag struct {
+	BlockTag bool   `json:"block_tag,omitempty"`
+	Start    string `json:"start,omitempty"`
+	End      string `json:"end,omitempty"`
 }
 
 type GeneralOpenAIRequest struct {

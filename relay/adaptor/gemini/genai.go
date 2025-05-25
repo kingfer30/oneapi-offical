@@ -334,8 +334,8 @@ func handleGenaiStream(c *gin.Context, meta *meta.Meta, iter *genai.GenerateCont
 					if meta.IncludeThinking {
 						//thinkingStart:\n%s\nthinkingEnd\n%s
 						if index >= 1 {
-							currentText := "<think>" + text
-							currentText += "</think>"
+							currentText := meta.ThinkingTagStart + text
+							currentText += meta.ThinkingTagEnd
 							currentText += text
 							meta.EndThinking = true
 						} else {

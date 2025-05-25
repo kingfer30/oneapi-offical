@@ -29,18 +29,22 @@ type Meta struct {
 	// OriginModelName is the model name from the raw user request
 	OriginModelName string
 	// ActualModelName is the model name after mapping
-	ActualModelName string
-	RequestURLPath  string
-	PromptTokens    int // only for DoResponse
-	SystemPrompt    string
-	IncludeThinking        bool
-	EndThinking     bool
-	UseThinking     bool
-	SelfImplement   bool
-	IsImageModel    bool
-	Image2Chat      bool
-	TextRequest     *relaymodel.GeneralOpenAIRequest
-	TxtRequestCount int
+	ActualModelName  string
+	RequestURLPath   string
+	PromptTokens     int // only for DoResponse
+	SystemPrompt     string
+	IncludeThinking  bool
+	StartThinking    bool
+	EndThinking      bool
+	EnableBlockTag   bool
+	ThinkingTagStart string
+	ThinkingTagEnd   string
+	UseThinking      bool
+	SelfImplement    bool
+	IsImageModel     bool
+	Image2Chat       bool
+	TextRequest      *relaymodel.GeneralOpenAIRequest
+	TxtRequestCount  int
 }
 
 func GetByContext(c *gin.Context) *Meta {

@@ -327,13 +327,31 @@ func (g *ChatResponse) GetResponseText(meta *meta.Meta) (string, string) {
 		if g.Candidates[0].Content.Parts[0].Thought {
 			reasoningContent = g.Candidates[0].Content.Parts[0].Text
 			if meta.IncludeThinking {
-				reasoningContent = fmt.Sprintf("<think>%s</think>", reasoningContent)
+				if meta.EnableBlockTag {
+					reasoningContent = fmt.Sprintf("%s%s%s", meta.ThinkingTagStart, reasoningContent, meta.ThinkingTagEnd)
+				} else {
+					if !meta.StartThinking {
+						reasoningContent = fmt.Sprintf("%s%s", meta.ThinkingTagStart, reasoningContent)
+						meta.StartThinking = true
+					} else {
+						reasoningContent = reasoningContent
+					}
+				}
 			}
 		} else {
-			responseText = g.Candidates[0].Content.Parts[0].Text
+			if !meta.EnableBlockTag {
+				if meta.StartThinking && !meta.EndThinking {
+					meta.EndThinking = true
+					responseText = fmt.Sprintf("%s%s", meta.ThinkingTagEnd, g.Candidates[0].Content.Parts[0].Text)
+				} else {
+					responseText = g.Candidates[0].Content.Parts[0].Text
+				}
+			} else {
+				responseText = g.Candidates[0].Content.Parts[0].Text
+			}
 		}
 		if meta.IncludeThinking {
-			responseText = fmt.Sprintf("%s\n%s", reasoningContent, responseText)
+			responseText = reasoningContent
 			reasoningContent = ""
 		}
 		return responseText, reasoningContent
@@ -399,7 +417,7 @@ func responseGeminiChat2OpenAI(response *ChatResponse, meta *meta.Meta) *openai.
 					}
 				}
 				if meta.IncludeThinking {
-					choice.Message.Content = fmt.Sprintf("<think>%s</think>\n%s", reasoningContent, responseText)
+					choice.Message.Content = fmt.Sprintf("%s%s%s\n%s", meta.ThinkingTagStart, reasoningContent, meta.ThinkingTagEnd, responseText)
 				} else {
 					choice.Message.Content = responseText
 					choice.Message.ReasoningContent = &reasoningContent
@@ -446,6 +464,7 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relay
 		data = strings.TrimPrefix(data, "data: ")
 		data = strings.TrimSuffix(data, "\"")
 		var geminiResponse ChatResponse
+		logger.SysLogf("data:%s", data)
 		err := json.Unmarshal([]byte(data), &geminiResponse)
 		if err != nil {
 			logger.SysError("error unmarshalling stream response: " + err.Error())

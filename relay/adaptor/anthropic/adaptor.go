@@ -49,6 +49,16 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	}
 	if request.Thinking != nil && request.Thinking.Type == "enabled" && request.Thinking.IncludeThinking {
 		c.Set("include_think", true)
+		if request.Thinking != nil && request.Thinking.Type == "enabled" && request.Thinking.ThinkingTag != nil {
+			c.Set("thinking_tag_start", request.Thinking.ThinkingTag.Start)
+			c.Set("thinking_tag_end", request.Thinking.ThinkingTag.End)
+			if request.Thinking.ThinkingTag.BlockTag {
+				c.Set("thinking_tag_block", true)
+			}
+		} else {
+			c.Set("thinking_tag_start", "<think>")
+			c.Set("thinking_tag_end", "</think>")
+		}
 	}
 	return ConvertRequest(*request), nil
 }
@@ -67,6 +77,15 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Meta) (usage *model.Usage, err *model.ErrorWithStatusCode) {
 	if c.GetBool("include_think") {
 		meta.IncludeThinking = true
+	}
+	if c.GetString("thinking_tag_start") != "" {
+		meta.ThinkingTagStart = c.GetString("thinking_tag_start")
+	}
+	if c.GetString("thinking_tag_end") != "" {
+		meta.ThinkingTagEnd = c.GetString("thinking_tag_end")
+	}
+	if c.GetBool("thinking_tag_block") {
+		meta.EnableBlockTag = true
 	}
 	if meta.IsStream {
 		err, usage = StreamHandler(c, resp, meta)

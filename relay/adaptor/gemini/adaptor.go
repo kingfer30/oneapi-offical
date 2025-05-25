@@ -79,8 +79,18 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	if request == nil {
 		return nil, errors.New("request is nil")
 	}
-	if request.Thinking == nil || (request.Thinking != nil && request.Thinking.IncludeThinking != false) {
+	if request.Thinking == nil || (request.Thinking != nil && request.Thinking.Type == "enabled" && request.Thinking.IncludeThinking != false) {
 		c.Set("include_think", true)
+		if request.Thinking != nil && request.Thinking.Type == "enabled" && request.Thinking.ThinkingTag != nil {
+			c.Set("thinking_tag_start", request.Thinking.ThinkingTag.Start)
+			c.Set("thinking_tag_end", request.Thinking.ThinkingTag.End)
+			if request.Thinking.ThinkingTag.BlockTag {
+				c.Set("thinking_tag_block", true)
+			}
+		} else {
+			c.Set("thinking_tag_start", "<think>")
+			c.Set("thinking_tag_end", "</think>")
+		}
 	}
 	switch relayMode {
 	case relaymode.Embeddings:
@@ -308,6 +318,15 @@ func doRequest(c *gin.Context, req *http.Request) (*http.Response, error) {
 func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Meta) (usage *model.Usage, err *model.ErrorWithStatusCode) {
 	if c.GetBool("include_think") {
 		meta.IncludeThinking = true
+	}
+	if c.GetString("thinking_tag_start") != "" {
+		meta.ThinkingTagStart = c.GetString("thinking_tag_start")
+	}
+	if c.GetString("thinking_tag_end") != "" {
+		meta.ThinkingTagEnd = c.GetString("thinking_tag_end")
+	}
+	if c.GetBool("thinking_tag_block") {
+		meta.EnableBlockTag = true
 	}
 	if !meta.SelfImplement || meta.Mode == relaymode.Embeddings {
 		//标记了流式 走流式输出

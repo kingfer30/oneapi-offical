@@ -234,7 +234,21 @@ func StreamResponseClaude2OpenAI(claudeResponse *StreamResponse, meta *meta.Meta
 				// 加密的不处理
 				reasoningContent = "\n"
 			case "thinking_delta":
-				reasoningContent = claudeResponse.Delta.Thinking
+				if meta.EnableBlockTag {
+					reasoningContent = fmt.Sprintf("%s%s%s", meta.ThinkingTagStart, claudeResponse.Delta.Thinking, meta.ThinkingTagEnd)
+				} else {
+					if !meta.StartThinking {
+						reasoningContent = fmt.Sprintf("%s%s", meta.ThinkingTagStart, claudeResponse.Delta.Thinking)
+						meta.StartThinking = true
+					} else {
+						reasoningContent = claudeResponse.Delta.Thinking
+					}
+				}
+			case "text_delta":
+				if meta.StartThinking && !meta.EndThinking {
+					meta.EndThinking = true
+					responseText = fmt.Sprintf("%s%s", meta.ThinkingTagEnd, responseText)
+				}
 			}
 		}
 	case "message_delta":
@@ -253,7 +267,6 @@ func StreamResponseClaude2OpenAI(claudeResponse *StreamResponse, meta *meta.Meta
 		choice.Delta.ReasoningContent = &reasoningContent
 	} else {
 		if reasoningContent != "" {
-			reasoningContent = fmt.Sprintf("<think>%s</think>", reasoningContent)
 			choice.Delta.Content = &reasoningContent
 		} else {
 			choice.Delta.Content = responseText
@@ -285,7 +298,7 @@ func ResponseClaude2OpenAI(claudeResponse *Response, meta *meta.Meta) *openai.Te
 			if item.Type == "thinking" {
 				ReasoningContent = item.Thinking
 				if meta.IncludeThinking {
-					responseText = fmt.Sprintf("<think>%s</think>%s", item.Thinking, responseText)
+					responseText = fmt.Sprintf("%s%s%s%s", meta.ThinkingTagStart, item.Thinking, meta.ThinkingTagEnd, responseText)
 				}
 			} else {
 				responseText = fmt.Sprintf("%s%s", responseText, item.Text)
@@ -365,7 +378,6 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model
 		data = strings.TrimPrefix(data, "data:")
 		data = strings.TrimSpace(data)
 
-		logger.SysLogf(data)
 		var claudeResponse StreamResponse
 		err := json.Unmarshal([]byte(data), &claudeResponse)
 		if err != nil {

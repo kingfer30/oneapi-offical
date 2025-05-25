@@ -23,6 +23,7 @@ import (
 	"github.com/songquanpeng/one-api/relay/adaptor/aws/utils"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/meta"
+	"github.com/songquanpeng/one-api/relay/model"
 	relaymodel "github.com/songquanpeng/one-api/relay/model"
 )
 
@@ -147,6 +148,10 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client, meta *meta.Met
 	var id string
 	var lastToolCallChoice openai.ChatCompletionsStreamResponseChoice
 
+	var promptTokens int
+	var completionTokens int
+	var quotaTokens int
+
 	c.Stream(func(w io.Writer) bool {
 		event, ok := <-stream.Events()
 		if !ok {
@@ -162,12 +167,32 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client, meta *meta.Met
 				logger.SysError("error unmarshalling stream response: " + err.Error())
 				return false
 			}
-			response, meta := anthropic.StreamResponseClaude2OpenAI(claudeResp, meta)
-			if meta != nil {
-				usage.PromptTokens += meta.Usage.InputTokens
-				usage.CompletionTokens += meta.Usage.OutputTokens
-				if len(meta.Id) > 0 { // only message_start has an id, otherwise it's a finish_reason event.
-					id = fmt.Sprintf("chatcmpl-%s", meta.Id)
+			response, currentResp := anthropic.StreamResponseClaude2OpenAI(claudeResp, meta)
+			if currentResp != nil {
+				usage.PromptTokens += currentResp.Usage.InputTokens
+				usage.CompletionTokens += currentResp.Usage.OutputTokens
+				if len(currentResp.Id) > 0 { // only message_start has an id, otherwise it's a finish_reason event.
+					id = fmt.Sprintf("chatcmpl-%s", currentResp.Id)
+					if currentResp.Usage != nil {
+						prompt, completion, quota := openai.ResetChatQuota(
+							currentResp.Usage.InputTokens,
+							currentResp.Usage.OutputTokens,
+							0,
+							0,
+							true,
+							meta,
+						)
+						promptTokens += prompt
+						completionTokens += completion
+						quotaTokens += quota
+
+						usage = model.Usage{
+							PromptTokens:     promptTokens,
+							CompletionTokens: completionTokens,
+							ThoughtsTokens:   0,
+							TotalTokens:      quotaTokens,
+						}
+					}
 					return true
 				} else { // finish_reason case
 					if len(lastToolCallChoice.Delta.ToolCalls) > 0 {
@@ -192,6 +217,27 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client, meta *meta.Met
 					lastToolCallChoice = choice
 				}
 			}
+			if currentResp != nil && currentResp.Usage != nil {
+				prompt, completion, quota := openai.ResetChatQuota(
+					currentResp.Usage.InputTokens,
+					currentResp.Usage.OutputTokens,
+					0,
+					0,
+					true,
+					meta,
+				)
+				promptTokens += prompt
+				completionTokens += completion
+				quotaTokens += quota
+			}
+			usage = model.Usage{
+				PromptTokens:     promptTokens,
+				CompletionTokens: completionTokens,
+				ThoughtsTokens:   0,
+				TotalTokens:      quotaTokens,
+			}
+			response.Usage = &usage
+
 			jsonStr, err := json.Marshal(response)
 			if err != nil {
 				logger.SysError("error marshalling stream response: " + err.Error())
