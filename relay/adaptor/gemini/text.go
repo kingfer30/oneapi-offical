@@ -351,7 +351,7 @@ func (g *ChatResponse) GetResponseText(meta *meta.Meta) (string, string) {
 			}
 		}
 		if meta.IncludeThinking {
-			responseText = reasoningContent
+			responseText = fmt.Sprintf("%s\n%s", reasoningContent, responseText)
 			reasoningContent = ""
 		}
 		return responseText, reasoningContent
