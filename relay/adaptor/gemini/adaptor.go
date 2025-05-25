@@ -79,7 +79,7 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	if request == nil {
 		return nil, errors.New("request is nil")
 	}
-	if request.Thinking != nil && request.Thinking.Type == "enabled" && request.Thinking.IncludeThinking {
+	if request.Thinking == nil || (request.Thinking != nil && request.Thinking.IncludeThinking != false) {
 		c.Set("include_think", true)
 	}
 	switch relayMode {
