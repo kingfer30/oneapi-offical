@@ -342,7 +342,7 @@ func (g *ChatResponse) GetResponseText(meta *meta.Meta) (string, string) {
 			if !meta.EnableBlockTag {
 				if meta.StartThinking && !meta.EndThinking {
 					meta.EndThinking = true
-					responseText = fmt.Sprintf("%s%s", meta.ThinkingTagEnd, g.Candidates[0].Content.Parts[0].Text)
+					responseText = fmt.Sprintf("%s\n%s", meta.ThinkingTagEnd, g.Candidates[0].Content.Parts[0].Text)
 				} else {
 					responseText = g.Candidates[0].Content.Parts[0].Text
 				}
@@ -351,8 +351,12 @@ func (g *ChatResponse) GetResponseText(meta *meta.Meta) (string, string) {
 			}
 		}
 		if meta.IncludeThinking {
-			responseText = fmt.Sprintf("%s\n%s", reasoningContent, responseText)
-			reasoningContent = ""
+			if reasoningContent != "" {
+				responseText = reasoningContent
+				reasoningContent = ""
+			} else {
+				responseText = responseText
+			}
 		}
 		return responseText, reasoningContent
 	}
@@ -464,7 +468,6 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relay
 		data = strings.TrimPrefix(data, "data: ")
 		data = strings.TrimSuffix(data, "\"")
 		var geminiResponse ChatResponse
-		logger.SysLogf("data:%s", data)
 		err := json.Unmarshal([]byte(data), &geminiResponse)
 		if err != nil {
 			logger.SysError("error unmarshalling stream response: " + err.Error())
