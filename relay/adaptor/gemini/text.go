@@ -326,6 +326,9 @@ func (g *ChatResponse) GetResponseText(meta *meta.Meta) (string, string) {
 	if len(g.Candidates) > 0 && len(g.Candidates[0].Content.Parts) > 0 {
 		if g.Candidates[0].Content.Parts[0].Thought {
 			reasoningContent = g.Candidates[0].Content.Parts[0].Text
+			if meta.IncludeThinking {
+				reasoningContent = fmt.Sprintf("<think>%s</think>", reasoningContent)
+			}
 		} else {
 			responseText = g.Candidates[0].Content.Parts[0].Text
 		}
@@ -396,7 +399,7 @@ func responseGeminiChat2OpenAI(response *ChatResponse, meta *meta.Meta) *openai.
 					}
 				}
 				if meta.IncludeThinking {
-					choice.Message.Content = fmt.Sprintf("%s\n%s", reasoningContent, responseText)
+					choice.Message.Content = fmt.Sprintf("<think>%s</think>\n%s", reasoningContent, responseText)
 				} else {
 					choice.Message.Content = responseText
 					choice.Message.ReasoningContent = &reasoningContent
@@ -477,7 +480,7 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relay
 		}
 
 		responseText += response.Choices[0].Delta.StringContent()
-		prompt, completion, quota := ResetChatQuota(
+		prompt, completion, quota := openai.ResetChatQuota(
 			geminiResponse.UsageMetadata.PromptTokenCount,
 			geminiResponse.UsageMetadata.CandidatesTokenCount,
 			geminiResponse.UsageMetadata.ThoughtsTokenCount,
@@ -565,7 +568,7 @@ func Handler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relaymodel.
 	fullTextResponse.Model = meta.ActualModelName
 	var usage relaymodel.Usage
 	if geminiResponse.UsageMetadata != nil {
-		prompt, completion, quota := ResetChatQuota(
+		prompt, completion, quota := openai.ResetChatQuota(
 			geminiResponse.UsageMetadata.PromptTokenCount,
 			geminiResponse.UsageMetadata.CandidatesTokenCount,
 			geminiResponse.UsageMetadata.ThoughtsTokenCount,

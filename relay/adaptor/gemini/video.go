@@ -68,7 +68,7 @@ func VideoHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model.
 	if meta.Image2Chat {
 		//请求画图模型, 以chat接口访问的, 按chat接口的格式返回
 		fullResponse, imgN := responseGemini2OpenAIChat(c, &geminiResponse)
-		prompt, completion, quota := ResetImg2ChatQuota(
+		prompt, completion, quota := openai.ResetImg2ChatQuota(
 			geminiResponse.UsageMetadata.PromptTokenCount,
 			geminiResponse.UsageMetadata.CandidatesTokenCount,
 			geminiResponse.UsageMetadata.TotalTokenCount,

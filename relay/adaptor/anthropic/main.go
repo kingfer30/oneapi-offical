@@ -240,7 +240,7 @@ func StreamResponseClaude2OpenAI(claudeResponse *StreamResponse, meta *meta.Meta
 	case "message_delta":
 		if claudeResponse.Usage != nil {
 			response = &Response{
-				Usage: *claudeResponse.Usage,
+				Usage: claudeResponse.Usage,
 			}
 		}
 		if claudeResponse.Delta != nil && claudeResponse.Delta.StopReason != nil {
@@ -253,6 +253,7 @@ func StreamResponseClaude2OpenAI(claudeResponse *StreamResponse, meta *meta.Meta
 		choice.Delta.ReasoningContent = &reasoningContent
 	} else {
 		if reasoningContent != "" {
+			reasoningContent = fmt.Sprintf("<think>%s</think>", reasoningContent)
 			choice.Delta.Content = &reasoningContent
 		} else {
 			choice.Delta.Content = responseText
@@ -284,7 +285,7 @@ func ResponseClaude2OpenAI(claudeResponse *Response, meta *meta.Meta) *openai.Te
 			if item.Type == "thinking" {
 				ReasoningContent = item.Thinking
 				if meta.IncludeThinking {
-					responseText = fmt.Sprintf("%s%s", responseText, item.Thinking)
+					responseText = fmt.Sprintf("<think>%s</think>%s", item.Thinking, responseText)
 				}
 			} else {
 				responseText = fmt.Sprintf("%s%s", responseText, item.Text)
@@ -352,6 +353,10 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model
 	var id string
 	var lastToolCallChoice openai.ChatCompletionsStreamResponseChoice
 
+	var promptTokens int
+	var completionTokens int
+	var quotaTokens int
+
 	for scanner.Scan() {
 		data := scanner.Text()
 		if len(data) < 6 || !strings.HasPrefix(data, "data:") {
@@ -360,6 +365,7 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model
 		data = strings.TrimPrefix(data, "data:")
 		data = strings.TrimSpace(data)
 
+		logger.SysLogf(data)
 		var claudeResponse StreamResponse
 		err := json.Unmarshal([]byte(data), &claudeResponse)
 		if err != nil {
@@ -367,13 +373,31 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model
 			continue
 		}
 
-		response, meta := StreamResponseClaude2OpenAI(&claudeResponse, meta)
-		if meta != nil {
-			usage.PromptTokens += meta.Usage.InputTokens
-			usage.CompletionTokens += meta.Usage.OutputTokens
-			if len(meta.Id) > 0 { // only message_start has an id, otherwise it's a finish_reason event.
-				modelName = meta.Model
-				id = fmt.Sprintf("chatcmpl-%s", meta.Id)
+		response, currentResp := StreamResponseClaude2OpenAI(&claudeResponse, meta)
+		if currentResp != nil {
+			if len(currentResp.Id) > 0 { // only message_start has an id, otherwise it's a finish_reason event.
+				modelName = currentResp.Model
+				id = fmt.Sprintf("chatcmpl-%s", currentResp.Id)
+				if currentResp.Usage != nil {
+					prompt, completion, quota := openai.ResetChatQuota(
+						currentResp.Usage.InputTokens,
+						currentResp.Usage.OutputTokens,
+						0,
+						0,
+						true,
+						meta,
+					)
+					promptTokens += prompt
+					completionTokens += completion
+					quotaTokens += quota
+
+					usage = model.Usage{
+						PromptTokens:     promptTokens,
+						CompletionTokens: completionTokens,
+						ThoughtsTokens:   0,
+						TotalTokens:      quotaTokens,
+					}
+				}
 				continue
 			} else { // finish_reason case
 				if len(lastToolCallChoice.Delta.ToolCalls) > 0 {
@@ -399,6 +423,26 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model
 				lastToolCallChoice = choice
 			}
 		}
+		if currentResp != nil && currentResp.Usage != nil {
+			prompt, completion, quota := openai.ResetChatQuota(
+				currentResp.Usage.InputTokens,
+				currentResp.Usage.OutputTokens,
+				0,
+				0,
+				true,
+				meta,
+			)
+			promptTokens += prompt
+			completionTokens += completion
+			quotaTokens += quota
+		}
+		usage = model.Usage{
+			PromptTokens:     promptTokens,
+			CompletionTokens: completionTokens,
+			ThoughtsTokens:   0,
+			TotalTokens:      quotaTokens,
+		}
+		response.Usage = &usage
 		err = render.ObjectData(c, response)
 		if err != nil {
 			logger.SysError(err.Error())
@@ -445,10 +489,18 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, meta *meta.M
 	}
 	fullTextResponse := ResponseClaude2OpenAI(&claudeResponse, meta)
 	fullTextResponse.Model = meta.ActualModelName
+	prompt, completion, quota := openai.ResetChatQuota(
+		claudeResponse.Usage.InputTokens,
+		claudeResponse.Usage.OutputTokens,
+		0,
+		0,
+		false,
+		meta,
+	)
 	usage := model.Usage{
-		PromptTokens:     claudeResponse.Usage.InputTokens,
-		CompletionTokens: claudeResponse.Usage.OutputTokens,
-		TotalTokens:      claudeResponse.Usage.InputTokens + claudeResponse.Usage.OutputTokens,
+		PromptTokens:     prompt,
+		CompletionTokens: completion,
+		TotalTokens:      quota,
 	}
 	fullTextResponse.Usage = usage
 	jsonResponse, err := json.Marshal(fullTextResponse)
