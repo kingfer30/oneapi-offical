@@ -342,7 +342,7 @@ func (g *ChatResponse) GetResponseText(meta *meta.Meta) (string, string) {
 			if !meta.EnableBlockTag {
 				if meta.StartThinking && !meta.EndThinking {
 					meta.EndThinking = true
-					responseText = fmt.Sprintf("%s\n%s", meta.ThinkingTagEnd, g.Candidates[0].Content.Parts[0].Text)
+					responseText = fmt.Sprintf("%s%s", meta.ThinkingTagEnd, g.Candidates[0].Content.Parts[0].Text)
 				} else {
 					responseText = g.Candidates[0].Content.Parts[0].Text
 				}
@@ -502,19 +502,11 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relay
 		}
 
 		responseText += response.Choices[0].Delta.StringContent()
-		prompt, completion, quota := openai.ResetChatQuota(
-			geminiResponse.UsageMetadata.PromptTokenCount,
-			geminiResponse.UsageMetadata.CandidatesTokenCount,
-			geminiResponse.UsageMetadata.ThoughtsTokenCount,
-			geminiResponse.UsageMetadata.TotalTokenCount,
-			true,
-			meta,
-		)
 		usage = &relaymodel.Usage{
-			PromptTokens:     prompt,
-			CompletionTokens: completion,
+			PromptTokens:     geminiResponse.UsageMetadata.PromptTokenCount,
+			CompletionTokens: geminiResponse.UsageMetadata.CandidatesTokenCount,
 			ThoughtsTokens:   geminiResponse.UsageMetadata.ThoughtsTokenCount,
-			TotalTokens:      quota,
+			TotalTokens:      geminiResponse.UsageMetadata.TotalTokenCount,
 		}
 		response.Usage = usage
 
@@ -590,19 +582,11 @@ func Handler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relaymodel.
 	fullTextResponse.Model = meta.ActualModelName
 	var usage relaymodel.Usage
 	if geminiResponse.UsageMetadata != nil {
-		prompt, completion, quota := openai.ResetChatQuota(
-			geminiResponse.UsageMetadata.PromptTokenCount,
-			geminiResponse.UsageMetadata.CandidatesTokenCount,
-			geminiResponse.UsageMetadata.ThoughtsTokenCount,
-			geminiResponse.UsageMetadata.TotalTokenCount,
-			false,
-			meta,
-		)
 		usage = relaymodel.Usage{
-			PromptTokens:     prompt,
-			CompletionTokens: completion,
+			PromptTokens:     geminiResponse.UsageMetadata.PromptTokenCount,
+			CompletionTokens: geminiResponse.UsageMetadata.CandidatesTokenCount,
 			ThoughtsTokens:   geminiResponse.UsageMetadata.ThoughtsTokenCount,
-			TotalTokens:      quota,
+			TotalTokens:      geminiResponse.UsageMetadata.TotalTokenCount,
 		}
 	} else {
 		responseText, reasoningContent := geminiResponse.GetResponseText(meta)

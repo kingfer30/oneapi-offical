@@ -150,7 +150,6 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client, meta *meta.Met
 
 	var promptTokens int
 	var completionTokens int
-	var quotaTokens int
 
 	c.Stream(func(w io.Writer) bool {
 		event, ok := <-stream.Events()
@@ -174,23 +173,13 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client, meta *meta.Met
 				if len(currentResp.Id) > 0 { // only message_start has an id, otherwise it's a finish_reason event.
 					id = fmt.Sprintf("chatcmpl-%s", currentResp.Id)
 					if currentResp.Usage != nil {
-						prompt, completion, quota := openai.ResetChatQuota(
-							currentResp.Usage.InputTokens,
-							currentResp.Usage.OutputTokens,
-							0,
-							0,
-							true,
-							meta,
-						)
-						promptTokens += prompt
-						completionTokens += completion
-						quotaTokens += quota
-
+						promptTokens += currentResp.Usage.InputTokens
+						completionTokens += currentResp.Usage.OutputTokens
 						usage = model.Usage{
 							PromptTokens:     promptTokens,
 							CompletionTokens: completionTokens,
 							ThoughtsTokens:   0,
-							TotalTokens:      quotaTokens,
+							TotalTokens:      promptTokens + completionTokens,
 						}
 					}
 					return true
@@ -218,23 +207,14 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client, meta *meta.Met
 				}
 			}
 			if currentResp != nil && currentResp.Usage != nil {
-				prompt, completion, quota := openai.ResetChatQuota(
-					currentResp.Usage.InputTokens,
-					currentResp.Usage.OutputTokens,
-					0,
-					0,
-					true,
-					meta,
-				)
-				promptTokens += prompt
-				completionTokens += completion
-				quotaTokens += quota
-			}
-			usage = model.Usage{
-				PromptTokens:     promptTokens,
-				CompletionTokens: completionTokens,
-				ThoughtsTokens:   0,
-				TotalTokens:      quotaTokens,
+				promptTokens += currentResp.Usage.InputTokens
+				completionTokens += currentResp.Usage.OutputTokens
+				usage = model.Usage{
+					PromptTokens:     promptTokens,
+					CompletionTokens: completionTokens,
+					ThoughtsTokens:   0,
+					TotalTokens:      promptTokens + completionTokens,
+				}
 			}
 			response.Usage = &usage
 

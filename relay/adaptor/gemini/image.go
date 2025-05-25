@@ -131,17 +131,10 @@ func ImageStreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*
 		}
 		response.Model = meta.ActualModelName
 		responseText += response.Choices[0].Delta.StringContent()
-		prompt, completion, quota := openai.ResetImg2ChatQuota(
-			geminiResponse.UsageMetadata.PromptTokenCount,
-			geminiResponse.UsageMetadata.CandidatesTokenCount,
-			geminiResponse.UsageMetadata.TotalTokenCount,
-			imgNum,
-			meta,
-		)
 		usage = &relaymodel.Usage{
-			PromptTokens:     prompt,
-			CompletionTokens: completion,
-			TotalTokens:      quota,
+			PromptTokens:     geminiResponse.UsageMetadata.PromptTokenCount,
+			CompletionTokens: geminiResponse.UsageMetadata.CandidatesTokenCount,
+			TotalTokens:      geminiResponse.UsageMetadata.TotalTokenCount,
 		}
 		response.Usage = usage
 
@@ -260,18 +253,11 @@ func ImageHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model.
 	var jsonResponse []byte
 	if meta.Image2Chat {
 		//请求画图模型, 以chat接口访问的, 按chat接口的格式返回
-		fullResponse, imgN := responseGemini2OpenAIChat(c, &geminiResponse)
-		prompt, completion, quota := openai.ResetImg2ChatQuota(
-			geminiResponse.UsageMetadata.PromptTokenCount,
-			geminiResponse.UsageMetadata.CandidatesTokenCount,
-			geminiResponse.UsageMetadata.TotalTokenCount,
-			imgN,
-			meta,
-		)
+		fullResponse, _ := responseGemini2OpenAIChat(c, &geminiResponse)
 		usage = relaymodel.Usage{
-			PromptTokens:     prompt,
-			CompletionTokens: completion,
-			TotalTokens:      quota,
+			PromptTokens:     geminiResponse.UsageMetadata.PromptTokenCount,
+			CompletionTokens: geminiResponse.UsageMetadata.CandidatesTokenCount,
+			TotalTokens:      geminiResponse.UsageMetadata.TotalTokenCount,
 		}
 		fullResponse.Usage = usage
 		jsonResponse, err = json.Marshal(fullResponse)

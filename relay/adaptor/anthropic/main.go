@@ -368,7 +368,6 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model
 
 	var promptTokens int
 	var completionTokens int
-	var quotaTokens int
 
 	for scanner.Scan() {
 		data := scanner.Text()
@@ -391,23 +390,13 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model
 				modelName = currentResp.Model
 				id = fmt.Sprintf("chatcmpl-%s", currentResp.Id)
 				if currentResp.Usage != nil {
-					prompt, completion, quota := openai.ResetChatQuota(
-						currentResp.Usage.InputTokens,
-						currentResp.Usage.OutputTokens,
-						0,
-						0,
-						true,
-						meta,
-					)
-					promptTokens += prompt
-					completionTokens += completion
-					quotaTokens += quota
-
+					promptTokens += currentResp.Usage.InputTokens
+					completionTokens += currentResp.Usage.OutputTokens
 					usage = model.Usage{
 						PromptTokens:     promptTokens,
 						CompletionTokens: completionTokens,
 						ThoughtsTokens:   0,
-						TotalTokens:      quotaTokens,
+						TotalTokens:      promptTokens + completionTokens,
 					}
 				}
 				continue
@@ -436,23 +425,14 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model
 			}
 		}
 		if currentResp != nil && currentResp.Usage != nil {
-			prompt, completion, quota := openai.ResetChatQuota(
-				currentResp.Usage.InputTokens,
-				currentResp.Usage.OutputTokens,
-				0,
-				0,
-				true,
-				meta,
-			)
-			promptTokens += prompt
-			completionTokens += completion
-			quotaTokens += quota
-		}
-		usage = model.Usage{
-			PromptTokens:     promptTokens,
-			CompletionTokens: completionTokens,
-			ThoughtsTokens:   0,
-			TotalTokens:      quotaTokens,
+			promptTokens += currentResp.Usage.InputTokens
+			completionTokens += currentResp.Usage.OutputTokens
+			usage = model.Usage{
+				PromptTokens:     promptTokens,
+				CompletionTokens: completionTokens,
+				ThoughtsTokens:   0,
+				TotalTokens:      promptTokens + completionTokens,
+			}
 		}
 		response.Usage = &usage
 		err = render.ObjectData(c, response)
@@ -501,18 +481,10 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, meta *meta.M
 	}
 	fullTextResponse := ResponseClaude2OpenAI(&claudeResponse, meta)
 	fullTextResponse.Model = meta.ActualModelName
-	prompt, completion, quota := openai.ResetChatQuota(
-		claudeResponse.Usage.InputTokens,
-		claudeResponse.Usage.OutputTokens,
-		0,
-		0,
-		false,
-		meta,
-	)
 	usage := model.Usage{
-		PromptTokens:     prompt,
-		CompletionTokens: completion,
-		TotalTokens:      quota,
+		PromptTokens:     claudeResponse.Usage.InputTokens,
+		CompletionTokens: claudeResponse.Usage.OutputTokens,
+		TotalTokens:      claudeResponse.Usage.InputTokens + claudeResponse.Usage.OutputTokens,
 	}
 	fullTextResponse.Usage = usage
 	jsonResponse, err := json.Marshal(fullTextResponse)
