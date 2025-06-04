@@ -59,7 +59,7 @@ func IsMediaUrl(url string) (bool, error) {
 		return false, nil
 	}
 
-	mediaRegex := regexp.MustCompile(`(mp4|mov|mpeg|mpg|webm|wmv|3gpp|avi|x-flv|pdf|wav|mp3|aiff|aac|ogg|flac)$`)
+	mediaRegex := regexp.MustCompile(`(mp4|mov|mpeg|mpg|webm|wmv|3gpp|avi|x-flv|pdf|txt|csv|wav|mp3|aiff|aac|ogg|flac)$`)
 	if mediaRegex.MatchString(strings.ToLower(url)) {
 		return true, nil
 	}
@@ -241,6 +241,9 @@ func CheckLegalUrl(apiType int, contentType string) (string, error) {
 		//pdf
 		case "application/pdf":
 			return "pdf", nil
+		//csv
+		case "text/csv":
+			return "csv", nil
 		//txt
 		case "text/plain":
 			return "txt", nil
