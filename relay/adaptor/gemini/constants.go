@@ -49,6 +49,7 @@ var ModelList = []string{
 	"gemini-2.5-pro-preview-tts",
 	"gemini-2.5-pro-preview-03-25",
 	"gemini-2.5-pro-preview-05-06",
+	"gemini-2.5-pro-preview-06-05",
 	"imagen-3.0-generate-002",
 	"veo-2.0-generate-001",
 }
