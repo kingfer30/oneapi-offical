@@ -41,10 +41,10 @@ var mimeTypeMap = map[string]string{
 // Setting safety to the lowest possible values since Gemini is already powerless enough
 func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest) (*ChatRequest, error) {
 	generationConfig := ChatGenerationConfig{
-		Temperature:     textRequest.Temperature,
-		TopP:            textRequest.TopP,
-		MaxOutputTokens: textRequest.MaxTokens,
-		StopSequences:   textRequest.Stop,
+		Temperature: textRequest.Temperature,
+		TopP:        textRequest.TopP,
+		// MaxOutputTokens: textRequest.MaxTokens,
+		StopSequences: textRequest.Stop,
 	}
 	if IsImageModel(textRequest.Model) {
 		generationConfig.ResponseModalities = []string{"text", "image"}
@@ -543,6 +543,9 @@ func Handler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relaymodel.
 	err = json.Unmarshal(responseBody, &geminiResponse)
 	if err != nil {
 		return openai.ErrorWrapper(err, "unmarshal_response_body_failed", http.StatusInternalServerError), nil
+	}
+	if config.DebugEnabled {
+		logger.SysLogf("body: %s", string(responseBody))
 	}
 	if len(geminiResponse.Candidates) == 0 {
 		if geminiResponse.PromptFeedback != nil && geminiResponse.PromptFeedback.BlockReason != "" {
