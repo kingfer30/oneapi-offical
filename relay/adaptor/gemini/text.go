@@ -168,7 +168,7 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 							} else {
 								fieldUrl = random.StrToMd5(part.ImageURL.Url)
 							}
-							fileOld, err := model.GetFile(fieldUrl)
+							fileOld, err := model.GetFile(textRequest.Model, fieldUrl)
 							if err != nil || fileOld.Id == 0 {
 								//为空则 重新获取
 								mimeType, fileName, err = image.GetImageFromUrl(part.ImageURL.Url, true)

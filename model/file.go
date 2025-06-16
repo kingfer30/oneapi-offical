@@ -9,6 +9,7 @@ import (
 
 type Files struct {
 	Id          int    `json:"id"`
+	Model       string `json:"model" gorm:"type:varchar(1024);index;"`
 	TokenId     int    `json:"token_id" gorm:"index;"`
 	Key         string `json:"key" gorm:"index;"`
 	ChannelId   int    `json:"channel_id" gorm:"index"`
@@ -29,9 +30,9 @@ func (file *Files) SaveFile() (error, int) {
 }
 
 // 获取文件
-func GetFile(url string) (*Files, error) {
+func GetFile(model string, url string) (*Files, error) {
 	var file *Files
-	err := DB.Order("id desc").Where("url = ?", url).Find(&file).Error
+	err := DB.Order("id desc").Where("model = ? AND url = ?", model, url).Find(&file).Error
 	return file, err
 }
 

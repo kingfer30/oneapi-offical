@@ -19,7 +19,7 @@ import (
 func FileHandler(c *gin.Context, fieldUrl string, url string, contentType string, fileName string) (string, string, error) {
 	meta := meta.GetByContext(c)
 	//判断文件是否已经存在
-	fileOld, err := model.GetFile(fieldUrl)
+	fileOld, err := model.GetFile(meta.OriginModelName, fieldUrl)
 	if err != nil {
 		return "", "", fmt.Errorf("get old file error: %s", err.Error())
 	}
@@ -27,7 +27,7 @@ func FileHandler(c *gin.Context, fieldUrl string, url string, contentType string
 	if currentKey == "" {
 		currentKey = meta.APIKey
 	}
-	if fileOld.FileId == "-1" {
+	if fileOld.FileId != "" {
 		//如果已存在当前句柄的x-new-api-key变量, 说明同个请求多个文件,例如A文件对应账号T1, 此时查询存在B文件但是对应key与A文件不同, 则需要重新上传
 		//如果不存在缓存key或者 不同文件的key相同, 则可以用旧的值, 否则都需要重新上传
 		newKey := c.GetString("x-new-api-key")
@@ -93,6 +93,7 @@ func FileHandler(c *gin.Context, fieldUrl string, url string, contentType string
 	}
 	//6. 保存文件数据
 	fileModel := model.Files{
+		Model:       meta.OriginModelName,
 		TokenId:     meta.TokenId,
 		Key:         currentKey,
 		ContentType: contentType,
