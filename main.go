@@ -68,21 +68,16 @@ func main() {
 	// model.InitModelsInfo()
 	logger.SysLog(fmt.Sprintf("using theme %s", config.Theme))
 	if common.RedisEnabled {
-		// for compatibility with old versions
 		config.MemoryCacheEnabled = true
 	}
 	if config.MemoryCacheEnabled {
 		logger.SysLog("memory cache enabled")
-		logger.SysLog(fmt.Sprintf("sync frequency: %d seconds", config.SyncFrequency))
 		model.InitChannelCache()
-	}
-	if config.MemoryCacheEnabled {
-		go model.SyncOptions(config.SyncFrequency)
-		go model.SyncChannelCache(config.SyncFrequency)
 	}
 	if os.Getenv("SYNC_CHANNEL_FREQUENCY") != "" {
 		//渠道缓存
 		frequency, err := strconv.Atoi(os.Getenv("SYNC_CHANNEL_FREQUENCY"))
+		logger.SysLog(fmt.Sprintf("sync frequency: %d seconds", frequency))
 		if err != nil {
 			logger.FatalLog("failed to parse SYNC_CHANNEL_FREQUENCY: " + err.Error())
 		}

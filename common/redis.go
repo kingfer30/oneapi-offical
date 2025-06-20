@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"time"
 	"strings"
+	"time"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/songquanpeng/one-api/common/logger"
@@ -19,11 +19,6 @@ func InitRedisClient() (err error) {
 	if os.Getenv("REDIS_CONN_STRING") == "" {
 		RedisEnabled = false
 		logger.SysLog("REDIS_CONN_STRING not set, Redis is not enabled")
-		return nil
-	}
-	if os.Getenv("SYNC_FREQUENCY") == "" {
-		RedisEnabled = false
-		logger.SysLog("SYNC_FREQUENCY not set, Redis is disabled")
 		return nil
 	}
 	redisConnString := os.Getenv("REDIS_CONN_STRING")
