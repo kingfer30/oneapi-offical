@@ -27,13 +27,13 @@ var (
 	GroupModelsCacheSeconds   = config.SyncFrequency
 )
 
-func CacheGetTokenByKey(key string) (*Token, error) {
+func CacheGetTokenByKey(key string, reGet bool) (*Token, error) {
 	keyCol := "`key`"
 	if common.UsingPostgreSQL {
 		keyCol = `"key"`
 	}
 	var token Token
-	if !common.RedisEnabled {
+	if !common.RedisEnabled || reGet {
 		err := DB.Where(keyCol+" = ?", key).First(&token).Error
 		return &token, err
 	}
@@ -225,27 +225,6 @@ func InitChannelCacheByMem() {
 	logger.SysLog("channels synced from database")
 }
 
-// func InitChannelCacheByRedis() {
-// 	logger.SysLog("apikeys cache begining")
-
-// 	var channels []*Channel
-// 	DB.Where("status = ?", ChannelStatusEnabled).Find(&channels)
-
-// 	common.RedisDel("apikeys:*")
-// 	var timeout = time.Duration(common.KeyCacheTimeout) * time.Second
-// 	for _, channel := range channels {
-// 		groups := strings.Split(channel.Group, ",")
-// 		for _, group := range groups {
-// 			models := strings.Split(channel.Models, ",")
-// 			for _, model := range models {
-// 				key := fmt.Sprintf("apikeys:%s:%s", group, model)
-// 				common.RedisZadd(key, strconv.Itoa(channel.Id), float64(*channel.Priority), timeout)
-// 			}
-// 		}
-// 	}
-// 	logger.SysLog("apikeys cache end")
-// }
-
 func SyncChannelCache(frequency int) {
 	for {
 		time.Sleep(time.Duration(frequency) * time.Second)
@@ -360,5 +339,49 @@ func WakeupChannel(frequency int) {
 		channelSyncLock.Unlock()
 		logger.SysLog("wakeup channel end")
 		time.Sleep(time.Duration(frequency) * time.Second)
+	}
+}
+
+// 获取错误的缓存key
+func GetErrorCacheByKey(key string) (int, map[string]any, error) {
+	if errString, serr := common.RedisGet(fmt.Sprintf("Auth_Error:%s", key)); serr == nil || errString != "" {
+		var info map[string]any
+		err := json.Unmarshal([]byte(errString), &info)
+		if err != nil {
+			return 0, nil, err
+		}
+		statusCode, ok := info["statusCode"].(float64)
+		if !ok {
+			return 0, nil, fmt.Errorf("no statusCode")
+		}
+		response, ok := info["response"].(map[string]interface{})
+		if !ok {
+			return 0, nil, fmt.Errorf("no response")
+		}
+		if statusCode <= 0 || response == nil {
+			return 0, nil, fmt.Errorf("empty")
+		}
+		return int(statusCode), response, nil
+	}
+	return 0, nil, fmt.Errorf("no key exists")
+}
+
+// 异步停止渠道软限制
+func SyncCloseSoftLimitChannel(frequency int) {
+	for {
+		time.Sleep(time.Duration(frequency) * time.Second)
+		logger.SysLog("begining close soft_limit channel")
+		channels, err := GetSoftLimitChannel()
+		if err != nil {
+			logger.SysErrorf("SyncCloseSoftLimitChannel error: %s", err.Error())
+			continue
+		}
+		for _, channel := range channels {
+			reason := fmt.Sprintf("当前渠道触发软限制自动停止，软限制使用量: %f，已使用: %f", float64(channel.SoftLimitUsd/500000), float64(channel.UsedQuota/500000))
+			DisableChannel(channel.Id, ChannelStatusManuallyDisabled, channel.Name, reason)
+
+			logger.SysLogf("【%s(%d)】%s", channel.Name, channel.Id, reason)
+		}
+		logger.SysLog("close soft_limit channel end")
 	}
 }

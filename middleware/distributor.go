@@ -27,16 +27,16 @@ func Distribute() func(c *gin.Context) {
 		if ok {
 			id, err := strconv.Atoi(channelId.(string))
 			if err != nil {
-				abortWithMessage(c, http.StatusBadRequest, "无效的渠道 Id")
+				abortWithMessage(c, http.StatusBadRequest, "Invalid channel ID", true)
 				return
 			}
 			channel, err = model.GetChannelById(id, true)
 			if err != nil {
-				abortWithMessage(c, http.StatusBadRequest, "无效的渠道 Id")
+				abortWithMessage(c, http.StatusBadRequest, "Invalid channel ID", true)
 				return
 			}
 			if channel.Status != model.ChannelStatusEnabled {
-				abortWithMessage(c, http.StatusForbidden, "该渠道已被禁用")
+				abortWithMessage(c, http.StatusForbidden, "The channel has been disabled", true)
 				return
 			}
 		} else {
@@ -45,10 +45,10 @@ func Distribute() func(c *gin.Context) {
 			if err != nil {
 				message := fmt.Sprintf("The model `%s` was overload, please try again later", requestModel)
 				if channel != nil {
-					logger.SysError(fmt.Sprintf("渠道不存在：%d", channel.Id))
-					message = "数据库一致性已被破坏，请联系管理员"
+					logger.SysError(fmt.Sprintf("Channel does not exist: %d", channel.Id))
+					message = "Database consistency has been broken, please contact the administrator"
 				}
-				abortWithMessage(c, http.StatusServiceUnavailable, message)
+				abortWithMessage(c, http.StatusServiceUnavailable, message, false)
 				return
 			}
 		}
@@ -58,20 +58,20 @@ func Distribute() func(c *gin.Context) {
 }
 
 func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, modelName string) {
+	c.Request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", channel.Key))
 	c.Set(ctxkey.Channel, channel.Type)
 	c.Set(ctxkey.ChannelId, channel.Id)
+	c.Set(ctxkey.CalcPrompt, channel.CalcPrompt)
 	c.Set(ctxkey.ChannelName, channel.Name)
 	if channel.SystemPrompt != nil && *channel.SystemPrompt != "" {
 		c.Set(ctxkey.SystemPrompt, *channel.SystemPrompt)
 	}
 	c.Set(ctxkey.ModelMapping, channel.GetModelMapping())
 	c.Set(ctxkey.OriginalModel, modelName) // for retry
-	c.Request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", channel.Key))
 	c.Set(ctxkey.BaseURL, channel.GetBaseURL())
 	cfg, _ := channel.LoadConfig()
 	// this is for backward compatibility
 	if channel.Other != nil {
-
 		switch channel.Type {
 		case channeltype.Azure:
 			if cfg.APIVersion == "" {

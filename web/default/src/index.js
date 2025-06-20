@@ -1,9 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import { Container } from 'semantic-ui-react';
 import App from './App';
-import Header from './components/Header';
+import Layout from './components/Layout';
 import Footer from './components/Footer';
 import 'semantic-ui-css/semantic.min.css';
 import './index.css';
@@ -18,12 +17,11 @@ root.render(
     <StatusProvider>
       <UserProvider>
         <BrowserRouter>
-          <Header />
-          <Container className={'main-content'}>
+          <Layout>
             <App />
-          </Container>
+            <Footer />
+          </Layout>
           <ToastContainer />
-          <Footer />
         </BrowserRouter>
       </UserProvider>
     </StatusProvider>

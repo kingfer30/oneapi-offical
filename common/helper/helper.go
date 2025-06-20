@@ -164,3 +164,10 @@ func Float64PtrMin(p *float64, minValue float64) *float64 {
 	}
 	return p
 }
+
+func GetCustomReturnError(c *gin.Context, txt string) error {
+	if c.GetString("custom_contact") == "" {
+		return fmt.Errorf(txt)
+	}
+	return fmt.Errorf("%s. You can contact us at %s", txt, c.GetString("custom_contact"))
+}

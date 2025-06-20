@@ -3,6 +3,7 @@ package ctxkey
 const (
 	Config            = "config"
 	Id                = "id"
+	UserId            = "id"
 	Username          = "username"
 	Role              = "role"
 	Status            = "status"
@@ -10,6 +11,7 @@ const (
 	ChannelId         = "channel_id"
 	SpecificChannelId = "specific_channel_id"
 	RequestModel      = "request_model"
+	CalcPrompt        = "calc_prompt"
 	ConvertedRequest  = "converted_request"
 	OriginalModel     = "original_model"
 	Group             = "group"
@@ -21,4 +23,9 @@ const (
 	AvailableModels   = "available_models"
 	KeyRequestBody    = "key_request_body"
 	SystemPrompt      = "system_prompt"
+	DpmLimit          = "token_dpm"
+	RpmLimit          = "token_rpm"
+	TpmLimit          = "token_tpm"
+	CustomContact     = "custom_contact"
+	ModerationsEnable = "moderations_enable"
 )

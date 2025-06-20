@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"mime/multipart"
 	"net/http"
 	"reflect"
@@ -95,7 +94,6 @@ func BindMultipartForm(r *http.Request, dest interface{}) error {
 
 		// 处理文本字段
 		values := r.MultipartForm.Value[tag]
-		log.Print(values)
 		if len(values) == 0 {
 			continue
 		}

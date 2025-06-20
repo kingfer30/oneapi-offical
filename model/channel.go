@@ -6,10 +6,13 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/logger"
+	"github.com/songquanpeng/one-api/common/message"
 	"gorm.io/gorm"
 )
 
@@ -34,6 +37,7 @@ type Channel struct {
 	Config             string  `json:"config"`
 	Weight             *uint   `json:"weight" gorm:"default:0"`
 	CreatedTime        int64   `json:"created_time" gorm:"bigint"`
+	Organization       string  `json:"organization" gorm:"type:varchar(50);default:''"`
 	TestTime           int64   `json:"test_time" gorm:"bigint"`
 	ResponseTime       int     `json:"response_time"` // in milliseconds
 	BaseURL            *string `json:"base_url" gorm:"column:base_url;default:''"`
@@ -41,12 +45,15 @@ type Channel struct {
 	Balance            float64 `json:"balance"` // in USD
 	BalanceUpdatedTime int64   `json:"balance_updated_time" gorm:"bigint"`
 	Models             string  `json:"models"`
-	Group              string  `json:"group" gorm:"type:varchar(32);default:'default'"`
+	Group              string  `json:"group" gorm:"type:varchar(500);default:'default'"`
 	ModelMapping       *string `json:"model_mapping" gorm:"type:varchar(1024);default:''"`
 	SystemPrompt       *string `json:"system_prompt" gorm:"type:text"`
 	RpmLimit           int     `json:"rpm_limit" gorm:"default:0"`
 	DpmLimit           int     `json:"dpm_limit" gorm:"default:0"`
 	TpmLimit           int     `json:"tpm_limit" gorm:"default:0"`
+	SoftLimitUsd       int     `json:"soft_limit_usd" gorm:"default:0;index:idx_soft_limit_usd"`
+	CalcPrompt         bool    `json:"calc_prompt" gorm:"default:1"`
+
 	// 新增字段，记录被禁用的模型
 	SleepModels map[string]int64 `gorm:"-"` // 标记为忽略数据库
 	SleepLock   sync.RWMutex     `gorm:"-"` // 锁也不需要持久化
@@ -355,4 +362,41 @@ func UpdateChannelsAbilities() (any, error) {
 		InitChannelCache()
 	}
 	return true, nil
+}
+
+// disable & notify
+func DisableChannel(channelId int, status int, channelName string, reason string) {
+	if config.RootUserEmail == "" {
+		config.RootUserEmail = GetRootUserEmail()
+	}
+	UpdateChannelStatusById(channelId, status)
+
+	//通知与缓存更新改为异步, 防止卡死
+	go func() {
+		subject := fmt.Sprintf("通道「%s」(#%d)已被禁用", channelName, channelId)
+		content := fmt.Sprintf("通道「%s」(#%d)已被禁用，原因: %s", channelName, channelId, reason)
+		//邮件只通知一次, 防止发送多封一样的
+		if count, serr := common.RedisExists(fmt.Sprintf("send_mail:%s", subject)); serr != nil || count == 0 {
+			ok, err := common.RedisSetNx(fmt.Sprintf("send_mail:%s", subject), "1", time.Duration(60*time.Second))
+			if ok || err == nil {
+				err := message.SendEmail(subject, config.RootUserEmail, content)
+				if err != nil {
+					logger.SysErrorf("failed to send email: %s", err.Error())
+				}
+			}
+		}
+
+		//重新初始化更新渠道信息
+		InitChannelCache()
+	}()
+}
+
+func GetSoftLimitChannel() ([]*Channel, error) {
+	var channels []*Channel
+	err := DB.Model(&Channel{}).Where("status = 1 and soft_limit_usd >0 and soft_limit_usd < used_quota").
+		Select("id", "name", "soft_limit_usd", "used_quota").Find(&channels).Error
+	if err != nil {
+		logger.SysErrorf("GetSoftLimitChannel faild: %s ", err.Error())
+	}
+	return channels, err
 }

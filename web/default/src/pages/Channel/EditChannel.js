@@ -3,6 +3,7 @@ import { Button, Form, Header, Input, Message, Segment } from 'semantic-ui-react
 import { useNavigate, useParams } from 'react-router-dom';
 import { API, copy, getChannelModels, showError, showInfo, showSuccess, verifyJSON } from '../../helpers';
 import { CHANNEL_OPTIONS } from '../../constants';
+import {  renderQuotaWithPrompt } from '../../helpers/render';
 
 const MODEL_MAPPING_EXAMPLE = {
   'gpt-3.5-turbo-0301': 'gpt-3.5-turbo',
@@ -46,7 +47,9 @@ const EditChannel = () => {
     model_mapping: '',
     system_prompt: '',
     models: [],
-    groups: ['default']
+    groups: ['default'],
+    organization: '',
+    soft_limit_usd: 0,
   };
   const [restock, setRestock] = useState(false);
   const [batch, setBatch] = useState(false);
@@ -196,6 +199,7 @@ const EditChannel = () => {
     localInputs.models = localInputs.models.join(',');
     localInputs.group = localInputs.groups.join(',');
     localInputs.config = JSON.stringify(config);
+    localInputs.soft_limit_usd=parseInt(localInputs.soft_limit_usd)
     if (isEdit) {
       res = await API.put(`/api/channel/`, { ...localInputs, id: parseInt(channelId) });
     } else {
@@ -463,6 +467,30 @@ const EditChannel = () => {
                   onChange={() => setRestock(!restock)}
                 />
               </Form.Field>
+              {
+            inputs.type === 1 ?
+              <Form.Field>
+                <Form.Input
+                  label='组织id(OpenAI)'
+                  name='organization'
+                  placeholder={'请输入组织OpenAI的组织id: org-xxx'}
+                  onChange={handleInputChange}
+                  value={inputs.organization}
+                  autoComplete='new-password'
+                />
+              </Form.Field> : <></>
+          }
+          {
+              <Form.Field>
+                <Form.Input
+                  label={`额度限制${renderQuotaWithPrompt(inputs.soft_limit_usd)}`}
+                  name='soft_limit_usd'
+                  placeholder={'请输入额度限制'}
+                  onChange={handleInputChange}
+                  value={inputs.soft_limit_usd}
+                />
+              </Form.Field> 
+          }
             </>
             )
           }

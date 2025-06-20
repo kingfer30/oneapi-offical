@@ -4,8 +4,6 @@ import { Link } from 'react-router-dom';
 import {
   API,
   loadChannelModels,
-  setPromptShown,
-  shouldShowPrompt,
   showError,
   showInfo,
   showSuccess,
@@ -65,7 +63,6 @@ function isShowDetail() {
   return localStorage.getItem("show_detail") === "true";
 }
 
-const promptID = "detail"
 
 const ChannelsTable = () => {
   const [channels, setChannels] = useState([]);
@@ -73,8 +70,6 @@ const ChannelsTable = () => {
   const [activePage, setActivePage] = useState(1);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searching, setSearching] = useState(false);
-  const [updatingBalance, setUpdatingBalance] = useState(false);
-  const [showPrompt, setShowPrompt] = useState(shouldShowPrompt(promptID));
   const [showDetail, setShowDetail] = useState(isShowDetail());
 
   const loadChannels = async (startIdx) => {
@@ -273,8 +268,29 @@ const ChannelsTable = () => {
     const res = await API.get(`/api/channel/search?keyword=${searchKeyword}`);
     const { success, message, data } = res.data;
     if (success) {
-      setChannels(data);
+       let localChannels = data.map((channel) => {
+        if (channel.models === '') {
+          channel.models = [];
+          channel.test_model = "";
+        } else {
+          channel.models = channel.models.split(',');
+          if (channel.models.length > 0) {
+            channel.test_model = channel.models[0];
+          }
+          channel.model_options = channel.models.map((model) => {
+            return {
+              key: model,
+              text: model,
+              value: model,
+            }
+          })
+        }
+        return channel;
+      });
+      
+      setChannels(localChannels);
       setActivePage(1);
+      
     } else {
       showError(message);
     }
@@ -344,17 +360,6 @@ const ChannelsTable = () => {
     }
   };
 
-  const updateAllChannelsBalance = async () => {
-    setUpdatingBalance(true);
-    const res = await API.get(`/api/channel/update_balance`);
-    const { success, message } = res.data;
-    if (success) {
-      showInfo('已更新完毕所有已启用渠道余额！');
-    } else {
-      showError(message);
-    }
-    setUpdatingBalance(false);
-  };
 
   const handleKeywordChange = async (e, { value }) => {
     setSearchKeyword(value.trim());
@@ -394,20 +399,6 @@ const ChannelsTable = () => {
           onChange={handleKeywordChange}
         />
       </Form>
-      {
-        showPrompt && (
-          <Message onDismiss={() => {
-            setShowPrompt(false);
-            setPromptShown(promptID);
-          }}>
-            OpenAI 渠道已经不再支持通过 key 获取余额，因此余额显示为 0。对于支持的渠道类型，请点击余额进行刷新。
-            <br />
-            渠道测试仅支持 chat 模型，优先使用 gpt-3.5-turbo，如果该模型不可用则使用你所配置的模型列表中的第一个模型。
-            <br />
-            点击下方详情按钮可以显示余额以及设置额外的测试模型。
-          </Message>
-        )
-      }
       <Table basic compact size='small'>
         <Table.Header>
           <Table.Row>
@@ -620,8 +611,6 @@ const ChannelsTable = () => {
               <Button size='small' loading={loading} onClick={() => { testChannels("disabled") }}>
                 测试禁用渠道
               </Button>
-              {/*<Button size='small' onClick={updateAllChannelsBalance}*/}
-              {/*        loading={loading || updatingBalance}>更新已启用渠道余额</Button>*/}
               <Popup
                 trigger={
                   <Button size='small' loading={loading}>

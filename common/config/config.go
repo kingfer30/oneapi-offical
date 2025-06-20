@@ -118,6 +118,7 @@ var requestInterval, _ = strconv.Atoi(os.Getenv("POLLING_INTERVAL"))
 var RequestInterval = time.Duration(requestInterval) * time.Second
 
 var SyncFrequency = env.Int("SYNC_FREQUENCY", 10*60) // unit is second
+var ErrorCacheTimeout = env.Int("ERROR_CACHE_TIMEOUT", 600)
 
 var BatchUpdateEnabled = false
 var BatchUpdateInterval = env.Int("BATCH_UPDATE_INTERVAL", 5)
@@ -134,8 +135,6 @@ var GeminiSafetySetting = env.String("GEMINI_SAFETY_SETTING", "BLOCK_NONE")
 var Theme = env.String("THEME", "default")
 var ValidThemes = map[string]bool{
 	"default": true,
-	"berry":   true,
-	"air":     true,
 }
 
 // All duration's unit is seconds
@@ -155,6 +154,9 @@ var (
 
 	CriticalRateLimitNum            = 20
 	CriticalRateLimitDuration int64 = 20 * 60
+
+	RalayRateLimitNum            = 60
+	RalayRateLimitDuration int64 = 60
 )
 
 var RateLimitKeyExpirationDuration = 20 * time.Minute

@@ -1,23 +1,40 @@
 package middleware
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common"
+	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/logger"
-	"strings"
 )
 
-func abortWithMessage(c *gin.Context, statusCode int, message string) {
-	c.JSON(statusCode, gin.H{
+func abortWithMessage(c *gin.Context, statusCode int, message string, needCache bool) {
+	res := gin.H{
 		"error": gin.H{
 			"message": helper.MessageWithRequestId(message, c.GetString(helper.RequestIdKey)),
-			"type":    "one_api_error",
+			"type":    "guoguo_api_error",
 		},
-	})
-	c.Abort()
+	}
+	c.JSON(statusCode, res)
+	if needCache && statusCode < 500 {
+		apiKey := c.GetString("api_key")
+		if apiKey != "" {
+			info := make(map[string]interface{})
+			info["statusCode"] = statusCode
+			info["response"] = res
+			jsonBytes, err := json.Marshal(info)
+			if err == nil {
+				common.RedisSetNx(fmt.Sprintf("Auth_Error:%s", apiKey), string(jsonBytes), time.Duration(config.ErrorCacheTimeout)*time.Second)
+			}
+		}
+	}
 	logger.Error(c.Request.Context(), message)
+	c.Abort()
 }
 
 func getRequestModel(c *gin.Context) (string, error) {

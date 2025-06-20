@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/songquanpeng/one-api/common/billing"
 	"github.com/songquanpeng/one-api/common/client"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/logger"
@@ -28,14 +29,11 @@ type OpenAISubscriptionResponse struct {
 	HardLimitUSD       float64 `json:"hard_limit_usd"`
 	SystemHardLimitUSD float64 `json:"system_hard_limit_usd"`
 	AccessUntil        int64   `json:"access_until"`
-}
-
-type OpenAIUsageDailyCost struct {
-	Timestamp float64 `json:"timestamp"`
-	LineItems []struct {
-		Name string  `json:"name"`
-		Cost float64 `json:"cost"`
-	}
+	Status             string  `json:"status"`
+	UsedUSD            float64 `json:"used_usd"`
+	BalanceUSD         float64 `json:"balance_usd"`
+	ExpireAt           string  `json:"expire_at"`
+	GPT4               bool    `json:"gpt4"`
 }
 
 type OpenAICreditGrants struct {
@@ -43,12 +41,6 @@ type OpenAICreditGrants struct {
 	TotalGranted   float64 `json:"total_granted"`
 	TotalUsed      float64 `json:"total_used"`
 	TotalAvailable float64 `json:"total_available"`
-}
-
-type OpenAIUsageResponse struct {
-	Object string `json:"object"`
-	//DailyCosts []OpenAIUsageDailyCost `json:"daily_costs"`
-	TotalUsage float64 `json:"total_usage"` // unit: 0.01 dollar
 }
 
 type OpenAISBUsageResponse struct {
@@ -338,7 +330,7 @@ func updateChannelBalance(channel *model.Channel) (float64, error) {
 	if err != nil {
 		return 0, err
 	}
-	usage := OpenAIUsageResponse{}
+	usage := billing.OpenAIUsageResponse{}
 	err = json.Unmarshal(body, &usage)
 	if err != nil {
 		return 0, err

@@ -13,6 +13,11 @@ const COPY_OPTIONS = [
   { key: 'lobechat', text: 'LobeChat', value: 'lobechat' },
 ];
 
+const ALERT_OPTIONS = [
+  { key: 'yue', text: '余额预警', value: 'yue' },
+  { key: 'expired', text: '过期预警', value: 'expired' },
+];
+
 const OPEN_LINK_OPTIONS = [
   { key: 'next', text: 'ChatGPT Next Web', value: 'next' },
   { key: 'ama', text: 'BotGem', value: 'ama' },
@@ -85,7 +90,7 @@ const TokensTable = () => {
     await loadTokens(activePage - 1);
   };
 
-  const onCopy = async (type, key) => {
+  const onCopy = async (type, key, expiredAt) => {
     let status = localStorage.getItem('status');
     let serverAddress = '';
     if (status) {
@@ -98,6 +103,7 @@ const TokensTable = () => {
     let encodedServerAddress = encodeURIComponent(serverAddress);
     const nextLink = localStorage.getItem('chat_link');
     let nextUrl;
+    expiredAt = expiredAt === -1 ? '永不过期' : timestamp2string(expiredAt, true)
   
     if (nextLink) {
       nextUrl = nextLink + `/#/?settings={"key":"sk-${key}","url":"${serverAddress}"}`;
@@ -119,8 +125,14 @@ const TokensTable = () => {
       case 'lobechat':
         url = nextLink + `/?settings={"keyVaults":{"openai":{"apiKey":"sk-${key}","baseURL":"${serverAddress}/v1"}}}`;
         break;
-      default:
+      case 'key':
         url = `sk-${key}`;
+        break;
+        case 'shop':
+        url = `API: ${serverAddress}----Key: sk-${key}`;
+        break;
+      default:
+        url = `API: ${serverAddress}\r\nKey: sk-${key}\r\nExpire At: ${expiredAt} `;
     }
     if (await copy(url)) {
       showSuccess('已复制到剪贴板！');
@@ -129,6 +141,17 @@ const TokensTable = () => {
       setSearchKeyword(url);
     }
   };
+
+  
+  const onAlertClick = async (type, id) => {
+    let res=await API.post('/api/token/alert?alertType='+type+'&id='+id);
+    const { success, message } = res.data;
+    if (success) {
+      showSuccess('操作成功！');
+    } else {
+      showError(message);
+    }
+  }
 
   const onOpenLink = async (type, key) => {
     let status = localStorage.getItem('status');
@@ -352,7 +375,7 @@ const TokensTable = () => {
                           size={'small'}
                           positive
                           onClick={async () => {
-                            await onCopy('', token.key);
+                            await onCopy('', token.key, token.expired_time);
                           }}
                         >
                           复制
@@ -363,13 +386,34 @@ const TokensTable = () => {
                           options={COPY_OPTIONS.map(option => ({
                             ...option,
                             onClick: async () => {
-                              await onCopy(option.value, token.key);
+                              await onCopy(option.value, token.key, token.expired_time);
                             }
                           }))}
                           trigger={<></>}
                         />
                       </Button.Group>
                       {' '}
+                      <Button.Group color='yellow' size={'small'}>
+                        <Button
+                          size={'small'}
+                          positive
+                          onClick={() => {
+                            onAlertClick('', token.id);
+                          }}>
+                          预警
+                        </Button>
+                        <Dropdown
+                          className="button icon"
+                          floating
+                          options={ALERT_OPTIONS.map(option => ({
+                            ...option,
+                            onClick: async () => {
+                              await onAlertClick(option.value, token.id);
+                            }
+                          }))}
+                          trigger={<></>}
+                        />
+                      </Button.Group>
                       <Button.Group color='blue' size={'small'}>
                         <Button
                             size={'small'}

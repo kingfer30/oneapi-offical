@@ -2,14 +2,15 @@ package middleware
 
 import (
 	"fmt"
+	"net/http"
+	"strings"
+
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common/blacklist"
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/common/network"
 	"github.com/songquanpeng/one-api/model"
-	"net/http"
-	"strings"
 )
 
 func authHelper(c *gin.Context, minRole int) {
@@ -92,51 +93,65 @@ func TokenAuth() func(c *gin.Context) {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
 		key := c.Request.Header.Get("Authorization")
-		key = strings.TrimPrefix(key, "Bearer ")
-		key = strings.TrimPrefix(key, "sk-")
+		apiKey := strings.TrimPrefix(key, "Bearer ")
+		c.Set("api_key", apiKey)
+		key = strings.TrimPrefix(apiKey, "sk-")
 		parts := strings.Split(key, "-")
 		key = parts[0]
-		token, err := model.ValidateUserToken(key)
+		statusCode, resp, err := model.GetErrorCacheByKey(apiKey)
+		if err == nil {
+			c.JSON(statusCode, resp)
+			c.Abort()
+			return
+		}
+		token, err := model.ValidateUserToken(c, key)
 		if err != nil {
-			abortWithMessage(c, http.StatusUnauthorized, err.Error())
+			abortWithMessage(c, http.StatusUnauthorized, err.Error(), true)
 			return
 		}
 		if token.Subnet != nil && *token.Subnet != "" {
 			if !network.IsIpInSubnets(ctx, c.ClientIP(), *token.Subnet) {
-				abortWithMessage(c, http.StatusForbidden, fmt.Sprintf("该令牌只能在指定网段使用：%s，当前 ip：%s", *token.Subnet, c.ClientIP()))
+				abortWithMessage(c, http.StatusForbidden, fmt.Sprintf("该令牌只能在指定网段使用：%s，当前 ip：%s", *token.Subnet, c.ClientIP()), true)
 				return
 			}
 		}
 		userEnabled, err := model.CacheIsUserEnabled(token.UserId)
 		if err != nil {
-			abortWithMessage(c, http.StatusInternalServerError, err.Error())
+			abortWithMessage(c, http.StatusInternalServerError, err.Error(), true)
 			return
 		}
 		if !userEnabled || blacklist.IsUserBanned(token.UserId) {
-			abortWithMessage(c, http.StatusForbidden, "用户已被封禁")
+			abortWithMessage(c, http.StatusForbidden, "User has been banned", true)
 			return
 		}
 		requestModel, err := getRequestModel(c)
 		if err != nil && shouldCheckModel(c) {
-			abortWithMessage(c, http.StatusBadRequest, err.Error())
+			abortWithMessage(c, http.StatusBadRequest, err.Error(), true)
 			return
 		}
 		c.Set(ctxkey.RequestModel, requestModel)
 		if token.Models != nil && *token.Models != "" {
 			c.Set(ctxkey.AvailableModels, *token.Models)
 			if requestModel != "" && !isModelInList(requestModel, *token.Models) {
-				abortWithMessage(c, http.StatusForbidden, fmt.Sprintf("该令牌无权使用模型：%s", requestModel))
+				abortWithMessage(c, http.StatusForbidden, fmt.Sprintf("该令牌无权使用模型：%s", requestModel), true)
 				return
 			}
 		}
 		c.Set(ctxkey.Id, token.UserId)
+		c.Set(ctxkey.UserId, token.UserId)
 		c.Set(ctxkey.TokenId, token.Id)
 		c.Set(ctxkey.TokenName, token.Name)
+		c.Set(ctxkey.DpmLimit, token.DpmLimit)
+		c.Set(ctxkey.RpmLimit, token.RpmLimit)
+		c.Set(ctxkey.TpmLimit, token.TpmLimit)
+		c.Set(ctxkey.CustomContact, token.CustomContact)
+		c.Set(ctxkey.ModerationsEnable, token.ModerationsEnable)
+
 		if len(parts) > 1 {
 			if model.IsAdmin(token.UserId) {
 				c.Set(ctxkey.SpecificChannelId, parts[1])
 			} else {
-				abortWithMessage(c, http.StatusForbidden, "普通用户不支持指定渠道")
+				abortWithMessage(c, http.StatusForbidden, "普通用户不支持指定渠道", false)
 				return
 			}
 		}
@@ -164,4 +179,23 @@ func shouldCheckModel(c *gin.Context) bool {
 		return true
 	}
 	return false
+}
+
+func KeyAuth() func(c *gin.Context) {
+	return func(c *gin.Context) {
+		key := c.Request.Header.Get("Authorization")
+		key = strings.TrimPrefix(key, "Bearer ")
+		key = strings.TrimPrefix(key, "sk-")
+		parts := strings.Split(key, "-")
+		key = parts[0]
+		token, err := model.CacheGetTokenByKey(key, true)
+		if err != nil {
+			abortWithMessage(c, http.StatusUnauthorized, err.Error(), true)
+			return
+		}
+		c.Set("token", token)
+		userGroup, _ := model.CacheGetUserGroup(token.UserId)
+		c.Set("group", userGroup)
+		c.Next()
+	}
 }

@@ -1,0 +1,131 @@
+.top-toolbar {
+  height: 50px;
+  background-color: #ffffff;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 20px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.theme-toggle-btn {
+  border: 1px solid #d4d4d5 !important;
+  background-color: transparent !important;
+  color: #767676 !important;
+  transition: all 0.2s ease !important;
+}
+
+.theme-toggle-btn:hover {
+  background-color: #f8f8f8 !important;
+  color: #333333 !important;
+  border-color: #bcbcbc !important;
+}
+
+.theme-toggle-btn:focus {
+  box-shadow: 0 0 0 2px rgba(33, 133, 208, 0.2) !important;
+}
+
+/* 深色主题样式 */
+[data-theme="dark"] .top-toolbar {
+  background-color: #2d2d2d;
+  border-bottom-color: #404040;
+}
+
+[data-theme="dark"] .theme-toggle-btn {
+  border-color: #555555 !important;
+  color: #cccccc !important;
+}
+
+[data-theme="dark"] .theme-toggle-btn:hover {
+  background-color: #404040 !important;
+  color: #ffffff !important;
+  border-color: #666666 !important;
+}
+
+/* 主内容区域主题样式 */
+[data-theme="dark"] .main-container {
+  background-color: #1a1a1a !important;
+  color: #ffffff;
+}
+
+[data-theme="light"] .main-container {
+  background-color: #ffffff !important;
+  color: #333333;
+}
+
+/* 页面内容主题样式 */
+[data-theme="dark"] .ui.segment {
+  background-color: #2d2d2d !important;
+  color: #ffffff !important;
+  border-color: #404040 !important;
+}
+
+[data-theme="dark"] .ui.header {
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .ui.table {
+  background-color: #2d2d2d !important;
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .ui.table thead th {
+  background-color: #404040 !important;
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .ui.table tbody tr {
+  border-color: #404040 !important;
+}
+
+[data-theme="dark"] .ui.table tbody tr:hover {
+  background-color: #404040 !important;
+}
+
+[data-theme="dark"] .ui.button {
+  background-color: #404040 !important;
+  color: #ffffff !important;
+  border-color: #555555 !important;
+}
+
+[data-theme="dark"] .ui.button:hover {
+  background-color: #555555 !important;
+}
+
+[data-theme="dark"] .ui.input input {
+  background-color: #2d2d2d !important;
+  color: #ffffff !important;
+  border-color: #555555 !important;
+}
+
+[data-theme="dark"] .ui.dropdown {
+  background-color: #2d2d2d !important;
+  color: #ffffff !important;
+  border-color: #555555 !important;
+}
+
+[data-theme="dark"] .ui.dropdown .menu {
+  background-color: #2d2d2d !important;
+  border-color: #555555 !important;
+}
+
+[data-theme="dark"] .ui.dropdown .menu .item {
+  color: #ffffff !important;
+  border-color: #404040 !important;
+}
+
+[data-theme="dark"] .ui.dropdown .menu .item:hover {
+  background-color: #404040 !important;
+}

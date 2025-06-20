@@ -10,7 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
+	"github.com/songquanpeng/one-api/common/logger"
 )
 
 func shouldAuth() bool {
@@ -106,4 +108,21 @@ func SendEmail(subject string, receiver string, content string) error {
 		err = smtp.SendMail(addr, auth, config.SMTPAccount, to, mail)
 	}
 	return err
+}
+
+// 异步不阻塞发送邮件, 增加锁避免发送重复
+func SendMailASync(email string, subject string, content string) {
+	go func() {
+		if email != "" {
+			if count, serr := common.RedisExists(fmt.Sprintf("send_mail:%s", subject)); serr != nil || count == 0 {
+				ok, err := common.RedisSetNx(fmt.Sprintf("send_mail:%s", subject), "1", time.Duration(60*time.Second))
+				if ok || err == nil {
+					err := SendEmail(subject, email, content)
+					if err != nil {
+						logger.SysErrorf("failed to send email: %s", err.Error())
+					}
+				}
+			}
+		}
+	}()
 }

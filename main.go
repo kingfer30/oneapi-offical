@@ -80,6 +80,46 @@ func main() {
 		go model.SyncOptions(config.SyncFrequency)
 		go model.SyncChannelCache(config.SyncFrequency)
 	}
+	if os.Getenv("SYNC_CHANNEL_FREQUENCY") != "" {
+		//渠道缓存
+		frequency, err := strconv.Atoi(os.Getenv("SYNC_CHANNEL_FREQUENCY"))
+		if err != nil {
+			logger.FatalLog("failed to parse SYNC_CHANNEL_FREQUENCY: " + err.Error())
+		}
+		go model.SyncChannelCache(frequency)
+	}
+	if os.Getenv("SYNC_OPTIONS_FREQUENCY") != "" {
+		//配置缓存
+		frequency, err := strconv.Atoi(os.Getenv("SYNC_OPTIONS_FREQUENCY"))
+		if err != nil {
+			logger.FatalLog("failed to parse SYNC_OPTIONS_FREQUENCY: " + err.Error())
+		}
+		go model.SyncOptions(frequency)
+	}
+	//渠道唤醒
+	if os.Getenv("SYNC_CHANNEL_WAKEUP") != "" {
+		frequency, err := strconv.Atoi(os.Getenv("SYNC_CHANNEL_WAKEUP"))
+		if err != nil {
+			logger.FatalLog("failed to parse SYNC_CHANNEL_WAKEUP: " + err.Error())
+		}
+		go monitor.WakeupChannel(frequency)
+	}
+	if os.Getenv("SYNC_CHANNEL_SOFTLIMIT") != "" {
+		//超软限制关闭
+		frequency, err := strconv.Atoi(os.Getenv("SYNC_CHANNEL_SOFTLIMIT"))
+		if err != nil {
+			logger.FatalLog("failed to parse SYNC_CHANNEL_SOFTLIMIT: " + err.Error())
+		}
+		go model.SyncCloseSoftLimitChannel(frequency)
+	}
+	if os.Getenv("SYNC_TOKEN_ALERT") != "" {
+		//token余额预警
+		frequency, err := strconv.Atoi(os.Getenv("SYNC_TOKEN_ALERT"))
+		if err != nil {
+			logger.FatalLog("failed to parse SYNC_TOKEN_ALERT: " + err.Error())
+		}
+		go model.SyncTokenAlert(frequency)
+	}
 	if os.Getenv("CHANNEL_TEST_FREQUENCY") != "" {
 		frequency, err := strconv.Atoi(os.Getenv("CHANNEL_TEST_FREQUENCY"))
 		if err != nil {
@@ -97,13 +137,6 @@ func main() {
 	}
 	if os.Getenv("AUTO_ACTIVATE_CHANNEL") == "true" {
 		go monitor.AutoActivate(10)
-	}
-	if os.Getenv("SYNC_CHANNEL_WAKEUP") != "" {
-		frequency, err := strconv.Atoi(os.Getenv("SYNC_CHANNEL_WAKEUP"))
-		if err != nil {
-			logger.FatalLog("failed to parse SYNC_CHANNEL_WAKEUP: " + err.Error())
-		}
-		go monitor.WakeupChannel(frequency)
 	}
 	go monitor.AutoDelFile(config.SyncFrequency)
 	openai.InitTokenEncoders()

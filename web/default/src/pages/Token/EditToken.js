@@ -15,11 +15,19 @@ const EditToken = () => {
     remain_quota: isEdit ? 0 : 500000,
     expired_time: -1,
     unlimited_quota: false,
+    batch_number: 1,
+    recharge_quota: 0,
+    rpm_limit: 600,
+    dpm_limit: 60,
+    tpm_limit: 60,
+    email: '',
+    custom_contact: '',
+    moderations_enable: false,
     models: [],
     subnet: "",
   };
   const [inputs, setInputs] = useState(originInputs);
-  const { name, remain_quota, expired_time, unlimited_quota } = inputs;
+  const { name, remain_quota, expired_time, unlimited_quota, moderations_enable, batch_number, recharge_quota, rpm_limit, dpm_limit, tpm_limit, email, custom_contact } = inputs;
   const navigate = useNavigate();
   const handleInputChange = (e, { name, value }) => {
     setInputs((inputs) => ({ ...inputs, [name]: value }));
@@ -44,6 +52,10 @@ const EditToken = () => {
 
   const setUnlimitedQuota = () => {
     setInputs({ ...inputs, unlimited_quota: !unlimited_quota });
+  };
+  
+  const setModerationsEnable = () => {
+    setInputs({ ...inputs, moderations_enable: !moderations_enable });
   };
 
   const loadToken = async () => {
@@ -92,6 +104,11 @@ const EditToken = () => {
     if (!isEdit && inputs.name === '') return;
     let localInputs = inputs;
     localInputs.remain_quota = parseInt(localInputs.remain_quota);
+    localInputs.batch_number = parseInt(localInputs.batch_number);
+    localInputs.rpm_limit = parseInt(localInputs.rpm_limit);
+    localInputs.dpm_limit = parseInt(localInputs.dpm_limit);
+    localInputs.tpm_limit = parseInt(localInputs.tpm_limit);
+    localInputs.recharge_quota = parseInt(localInputs.recharge_quota);
     if (localInputs.expired_time !== -1) {
       let time = Date.parse(localInputs.expired_time);
       if (isNaN(time)) {
@@ -136,6 +153,103 @@ const EditToken = () => {
               required={!isEdit}
             />
           </Form.Field>
+          <Form.Field>
+            <Form.Input
+              label={`额度${renderQuotaWithPrompt(remain_quota)}`}
+              name='remain_quota'
+              placeholder={'请输入额度'}
+              onChange={handleInputChange}
+              value={remain_quota}
+              autoComplete='new-password'
+              type='number'
+              disabled={unlimited_quota}
+            />
+            <div style={{ lineHeight: '40px' }}>
+              <Button type={'button'} onClick={() => {
+                setInputs({ ...inputs, remain_quota: 5 * 500000 })
+              }}>5$</Button>
+              <Button type={'button'} onClick={() => {
+                setInputs({ ...inputs, remain_quota: 10 * 500000 })
+              }}>10$</Button>
+               <Button type={'button'} onClick={() => {
+                setInputs({ ...inputs, remain_quota: 15 * 500000 })
+              }}>15$</Button> <Button type={'button'} onClick={() => {
+                setInputs({ ...inputs, remain_quota: 20 * 500000 })
+              }}>20$</Button>
+              <Button type={'button'} onClick={() => {
+                setInputs({ ...inputs, remain_quota: 100 * 500000 })
+              }}>100$</Button>
+              <Button type={'button'} onClick={() => {
+                setInputs({ ...inputs, remain_quota: 120 * 500000 })
+              }}>120$</Button>
+              <Button type={'button'} onClick={() => {
+                setUnlimitedQuota();
+              }}>{unlimited_quota ? '取消无限额度' : '设为无限额度'}</Button>
+            </div>
+          </Form.Field>
+          {isEdit ? (<Form.Field>
+            <Form.Input
+              label={`增加额度`}
+              name='recharge_quota'
+              placeholder={'请输入额度($)'}
+              onChange={handleInputChange}
+              value={recharge_quota}
+              type='number'
+            />
+          </Form.Field>
+          ) : <></>}
+          <Form.Field>
+            <Form.Input
+              label='RPM'
+              name='rpm_limit'
+              placeholder={'请输入RPM限制'}
+              onChange={handleInputChange}
+              value={rpm_limit}
+              type='number'
+            />
+          </Form.Field>
+          <Form.Field>
+            <Form.Input
+              label='通知邮箱'
+              name='email'
+              placeholder={'请输入email'}
+              onChange={handleInputChange}
+              value={email}
+            />
+          </Form.Field>
+          <Form.Field>
+            <Form.Input
+              label='DPM'
+              name='dpm_limit'
+              placeholder={'请输入DPM限制'}
+              onChange={handleInputChange}
+              value={dpm_limit}
+              type='number'
+            />
+          </Form.Field>
+          <Form.Field>
+            <Form.Input
+              label='TPM'
+              name='tpm_limit'
+              placeholder={'请输入TPM限制'}
+              onChange={handleInputChange}
+              value={tpm_limit}
+              type='number'
+            />
+          </Form.Field>
+          {!isEdit ? (
+            <Form.Field>
+              <Form.Input
+                label='批量创建'
+                name='batch_number'
+                placeholder={'请输入需要创建的数量'}
+                onChange={handleInputChange}
+                value={batch_number}
+                autoComplete='new-password'
+                type='number'
+              />
+            </Form.Field>
+          ) : <></>}
           <Form.Field>
             <Form.Dropdown
               label='模型范围'
@@ -192,24 +306,23 @@ const EditToken = () => {
               setExpiredTime(0, 0, 0, 1);
             }}>一分钟后过期</Button>
           </div>
-          <Message>注意，令牌的额度仅用于限制令牌本身的最大额度使用量，实际的使用受到账户的剩余额度限制。</Message>
+          <Form.Checkbox
+                checked={moderations_enable}
+                label='开启内容审核(针对OpenAI渠道)'
+                name='moderations_enable'
+                onChange={() => setModerationsEnable()}
+              />
           <Form.Field>
             <Form.Input
-              label={`额度${renderQuotaWithPrompt(remain_quota)}`}
-              name='remain_quota'
-              placeholder={'请输入额度'}
+              label='自定义联系方式'
+              name='custom_contact'
+              placeholder={'请输入自定义联系方式'}
               onChange={handleInputChange}
-              value={remain_quota}
-              autoComplete='new-password'
-              type='number'
-              disabled={unlimited_quota}
+              value={custom_contact}
             />
           </Form.Field>
-          <Button type={'button'} onClick={() => {
-            setUnlimitedQuota();
-          }}>{unlimited_quota ? '取消无限额度' : '设为无限额度'}</Button>
-          <Button floated='right' positive onClick={submit}>提交</Button>
-          <Button floated='right' onClick={handleCancel}>取消</Button>
+          <Button positive onClick={submit}>提交</Button>
+          <Button onClick={handleCancel}>取消</Button>
         </Form>
       </Segment>
     </>
