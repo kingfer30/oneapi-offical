@@ -8,8 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
-	"math"
 	"net/http"
 	"runtime"
 	"strings"
@@ -25,7 +23,6 @@ import (
 	"github.com/songquanpeng/one-api/relay/channeltype"
 	"github.com/songquanpeng/one-api/relay/meta"
 	relaymodel "github.com/songquanpeng/one-api/relay/model"
-	"github.com/songquanpeng/one-api/relay/relaymode"
 )
 
 func getVideoRequest(c *gin.Context, _ int) (*relaymodel.VideoRequest, error) {
@@ -90,29 +87,10 @@ func getVideoRequest(c *gin.Context, _ int) (*relaymodel.VideoRequest, error) {
 
 func validateVideoRequest(videoRequest *relaymodel.VideoRequest, meta *meta.Meta) *relaymodel.ErrorWithStatusCode {
 	// check prompt length
-	if videoRequest.Prompt == "" {
+	if videoRequest.Prompt == "" && videoRequest.Image == "" {
 		return openai.ErrorWrapper(errors.New("prompt is required"), "prompt_missing", http.StatusBadRequest)
 	}
-
-	if meta.Mode == relaymode.ImagesEdit {
-		if videoRequest.Image == "" {
-			return openai.ErrorWrapper(errors.New("Image is required"), "video_missing", http.StatusBadRequest)
-		}
-	} else {
-		//图片创建的清楚图片编辑
-		if videoRequest.Image != "" {
-			videoRequest.Image = ""
-		}
-	}
 	return nil
-}
-
-func getVideoCostRatio(videoRequest *relaymodel.VideoRequest) (float64, error) {
-	if videoRequest == nil {
-		return 0, errors.New("videoRequest is nil")
-	}
-	videoCostRatio := getImageSizeRatio(videoRequest.Model, videoRequest.Size)
-	return videoCostRatio, nil
 }
 
 func RelayVideoHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatusCode {
@@ -120,7 +98,7 @@ func RelayVideoHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	meta := meta.GetByContext(c)
 	videoRequest, err := getVideoRequest(c, meta.Mode)
 	if err != nil {
-		logger.Errorf(ctx, "getImageRequest failed: %s", err.Error())
+		logger.Errorf(ctx, "getVideoRequest failed: %s", err.Error())
 		return openai.ErrorWrapper(err, "invalid_video_request", http.StatusBadRequest)
 	}
 
@@ -136,14 +114,9 @@ func RelayVideoHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		return bizErr
 	}
 
-	videoCostRatio, err := getVideoCostRatio(videoRequest)
-	if err != nil {
-		return openai.ErrorWrapper(err, "get_video_cost_ratio_failed", http.StatusInternalServerError)
-	}
-
 	videoModel := videoRequest.Model
 	// Convert the original video model
-	videoRequest.Model, _ = getMappedModelName(videoRequest.Model, billingratio.ImageOriginModelName)
+	videoRequest.Model, _ = getMappedModelName(videoRequest.Model, meta.ModelMapping)
 
 	var requestBody io.Reader
 	var jsonStr []byte
@@ -170,7 +143,7 @@ func RelayVideoHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		channeltype.Replicate,
 		channeltype.Gemini,
 		channeltype.Baidu:
-		finalRequest, err := adaptor.ConvertVideoRequest(videoRequest)
+		finalRequest, err := adaptor.ConvertVideoRequest(c, videoRequest)
 		if err != nil {
 			return openai.ErrorWrapper(err, "convert_video_request_failed", http.StatusInternalServerError)
 		}
@@ -191,11 +164,17 @@ func RelayVideoHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 
 	modelRatio := billingratio.GetModelRatio(videoModel, meta.ChannelType, meta.Group)
 	groupRatio := billingratio.GetGroupRatio(meta.Group)
-	completionRatio := billingratio.GetCompletionRatio(videoModel, meta.ChannelType)
 	ratio := modelRatio * groupRatio
 	userQuota, _ := model.CacheGetUserQuota(ctx, meta.UserId)
 
-	quota := int64(ratio * videoCostRatio * 1000)
+	var quota int64
+	switch meta.ChannelType {
+	// case channeltype.Replicate:
+	// 	quota = int64(ratio * imageCostRatio * 1000)
+	default:
+		//按秒计费, 默认5秒
+		quota = int64(ratio * 5)
+	}
 
 	if userQuota-quota < 0 {
 		return openai.ErrorWrapper(errors.New("user quota is not enough"), "insufficient_user_quota", http.StatusForbidden)
@@ -215,21 +194,24 @@ func RelayVideoHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		return respErr
 	}
 
+	prompt := 0
+	completion := 0
 	defer func(ctx context.Context) {
 		if resp != nil &&
 			resp.StatusCode != http.StatusCreated && // replicate returns 201
 			resp.StatusCode != http.StatusOK {
 			return
 		}
-
-		//如果返回的token比计算的大, 则使用它的
-		prompt := 0
-		completion := 0
-		if usage != nil && usage.TotalTokens > int(quota) {
+		extendLog := ""
+		//有返回usage的, 按照它的计算
+		if usage != nil {
 			prompt = usage.PromptTokens
 			completion = usage.CompletionTokens
-			quota = int64(math.Ceil((float64(prompt) + float64(completion)*completionRatio) * ratio))
-			log.Printf("quota:%d", quota)
+			if meta.ChannelType == channeltype.Gemini {
+				//gemini 按秒计费, 默认5秒
+				quota = int64(float64(usage.VideoTokens) * ratio)
+				extendLog = fmt.Sprintf("视频长度: %ds, ", usage.VideoTokens)
+			}
 			if usage.TotalTokens > int(quota) {
 				quota = int64(usage.TotalTokens)
 			}
@@ -244,7 +226,7 @@ func RelayVideoHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		}
 		if quota != 0 {
 			tokenName := c.GetString(ctxkey.TokenName)
-			logContent := fmt.Sprintf("模型倍率 %.2f，分组倍率 %.2f", modelRatio, groupRatio)
+			logContent := fmt.Sprintf("%s模型倍率 %.2f，分组倍率 %.2f", extendLog, modelRatio, groupRatio)
 			model.RecordConsumeLog(ctx, meta.UserId, meta.ChannelId, prompt, completion, videoRequest.Model, tokenName, quota, logContent)
 			model.UpdateUserUsedQuotaAndRequestCount(meta.UserId, quota)
 			channelId := c.GetInt(ctxkey.ChannelId)

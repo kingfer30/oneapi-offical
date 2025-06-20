@@ -27,7 +27,7 @@ func relayHelper(c *gin.Context, relayMode int) *model.ErrorWithStatusCode {
 	var err *model.ErrorWithStatusCode
 	switch relayMode {
 	case relaymode.VideoGenerations:
-		err = controller.RelayImageHelper(c, relayMode)
+		err = controller.RelayVideoHelper(c, relayMode)
 	case relaymode.ImagesGenerations:
 		err = controller.RelayImageHelper(c, relayMode)
 	case relaymode.ImagesEdit:
@@ -37,7 +37,7 @@ func relayHelper(c *gin.Context, relayMode int) *model.ErrorWithStatusCode {
 			c.JSON(http.StatusNotImplemented, gin.H{
 				"error": model.Error{
 					Message: "API not implemented",
-					Type:    "one_api_error",
+					Type:    "guoguo_api_error",
 					Param:   "",
 					Code:    "api_not_implemented",
 				},
@@ -170,7 +170,7 @@ func processChannelRelayError(c *gin.Context, userId int, channelId int, channel
 func RelayNotImplemented(c *gin.Context) {
 	err := model.Error{
 		Message: "API not implemented",
-		Type:    "one_api_error",
+		Type:    "guoguo_api_error",
 		Param:   "",
 		Code:    "api_not_implemented",
 	}

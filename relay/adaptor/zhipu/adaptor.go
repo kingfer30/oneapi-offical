@@ -3,6 +3,10 @@ package zhipu
 import (
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/relay/adaptor"
@@ -10,9 +14,6 @@ import (
 	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
 	"github.com/songquanpeng/one-api/relay/relaymode"
-	"io"
-	"net/http"
-	"strings"
 )
 
 type Adaptor struct {
@@ -148,7 +149,7 @@ func (a *Adaptor) GetChannelName() string {
 	return "zhipu"
 }
 
-func (a *Adaptor) ConvertVideoRequest(request *model.VideoRequest) (any, error) {
+func (a *Adaptor) ConvertVideoRequest(c *gin.Context, request *model.VideoRequest) (any, error) {
 	if request == nil {
 		return nil, errors.New("request is nil")
 	}

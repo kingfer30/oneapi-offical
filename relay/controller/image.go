@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"math"
 	"net/http"
 	"runtime"
@@ -48,38 +47,43 @@ func getImageRequest(c *gin.Context, _ int) (*relaymodel.ImageRequest, error) {
 		imageRequest.Prompt = imageFormRequest.Prompt
 		imageRequest.Quality = imageFormRequest.Quality
 		imageRequest.Size = imageFormRequest.Size
-		//将上传图片转为b64
-		file, err := imageFormRequest.Image.Open()
-		if err != nil {
-			return nil, fmt.Errorf("failed to open file: %w", err)
-		}
-		defer file.Close()
-		var encodedBuilder strings.Builder
-		encoder := base64.NewEncoder(base64.StdEncoding, &encodedBuilder)
-		defer encoder.Close()
+		if len(imageFormRequest.Image) > 0 {
+			for _, img := range imageFormRequest.Image {
+				//将上传图片转为b64
+				file, err := img.Open()
+				if err != nil {
+					return nil, fmt.Errorf("failed to open file: %w", err)
+				}
+				defer file.Close()
+				var encodedBuilder strings.Builder
+				encoder := base64.NewEncoder(base64.StdEncoding, &encodedBuilder)
+				defer encoder.Close()
 
-		// 设置内存安全限制（示例设为20MB）
-		const maxSize = 20 << 20 // 20MB
-		limitedReader := io.LimitReader(file, maxSize)
+				// 设置内存安全限制（示例设为20MB）
+				const maxSize = 20 << 20 // 20MB
+				limitedReader := io.LimitReader(file, maxSize)
 
-		bytesCopied, err := io.Copy(encoder, limitedReader) // 流式处理
-		if err != nil {
-			return nil, fmt.Errorf("image reading error: %v", err)
-		}
-		// 检查是否超过大小限制
-		if bytesCopied >= maxSize {
-			var m runtime.MemStats
-			runtime.ReadMemStats(&m)
-			logger.SysLogf("Memory usage: HeapInuse=%v MiB", m.HeapInuse/1024/1024)
-			logger.SysLogf("images is too large: %s,", imageFormRequest.Image.Filename)
-			return nil, fmt.Errorf("image exceeds maximum allowed size")
+				bytesCopied, err := io.Copy(encoder, limitedReader) // 流式处理
+				if err != nil {
+					return nil, fmt.Errorf("image reading error: %v", err)
+				}
+				// 检查是否超过大小限制
+				if bytesCopied >= maxSize {
+					var m runtime.MemStats
+					runtime.ReadMemStats(&m)
+					logger.SysLogf("Memory usage: HeapInuse=%v MiB", m.HeapInuse/1024/1024)
+					logger.SysLogf("images is too large: %s,", img.Filename)
+					return nil, fmt.Errorf("image exceeds maximum allowed size")
+				}
+
+				// 确保所有数据刷新到builder
+				if err := encoder.Close(); err != nil {
+					return nil, fmt.Errorf("base64 close error: %w", err)
+				}
+				imageRequest.Image = append(imageRequest.Image, encodedBuilder.String())
+			}
 		}
 
-		// 确保所有数据刷新到builder
-		if err := encoder.Close(); err != nil {
-			return nil, fmt.Errorf("base64 close error: %w", err)
-		}
-		imageRequest.Image = encodedBuilder.String()
 	}
 	if imageRequest.N == 0 {
 		imageRequest.N = 1
@@ -139,13 +143,13 @@ func validateImageRequest(imageRequest *relaymodel.ImageRequest, meta *meta.Meta
 	}
 
 	if meta.Mode == relaymode.ImagesEdit {
-		if imageRequest.Image == "" {
+		if len(imageRequest.Image) == 0 {
 			return openai.ErrorWrapper(errors.New("image is required"), "image_missing", http.StatusBadRequest)
 		}
 	} else {
-		//图片创建的清楚图片编辑
-		if imageRequest.Image != "" {
-			imageRequest.Image = ""
+		//图片创建的清除图片编辑
+		if len(imageRequest.Image) > 0 {
+			imageRequest.Image = make([]string, 0)
 		}
 	}
 	return nil
@@ -274,21 +278,22 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		return respErr
 	}
 
+	prompt := 0
+	completion := 0
 	defer func(ctx context.Context) {
 		if resp != nil &&
 			resp.StatusCode != http.StatusCreated && // replicate returns 201
 			resp.StatusCode != http.StatusOK {
 			return
 		}
-
-		//如果返回的token比计算的大, 则使用它的
-		prompt := 0
-		completion := 0
-		if usage != nil && usage.TotalTokens > int(quota) {
+		//有返回usage的, 按照它的计算
+		if usage != nil {
 			prompt = usage.PromptTokens
 			completion = usage.CompletionTokens
-			quota = int64(math.Ceil((float64(prompt) + float64(completion)*completionRatio) * ratio))
-			log.Printf("quota:%d", quota)
+			if meta.ChannelType == channeltype.Gemini {
+				//gemini按照正常chat计费
+				quota = int64(math.Ceil((float64(prompt) + float64(completion)*completionRatio) * ratio))
+			}
 			if usage.TotalTokens > int(quota) {
 				quota = int64(usage.TotalTokens)
 			}

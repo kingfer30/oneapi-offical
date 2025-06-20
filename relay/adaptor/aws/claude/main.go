@@ -56,7 +56,7 @@ func awsModelID(requestModel string) (string, error) {
 func Handler(c *gin.Context, awsCli *bedrockruntime.Client, meta *meta.Meta) (*relaymodel.ErrorWithStatusCode, *relaymodel.Usage) {
 	awsModelId, err := awsModelID(c.GetString(ctxkey.RequestModel))
 	if err != nil {
-		return utils.WrapErr(errors.Wrap(err, "awsModelID")), nil
+		return utils.WrapErr(errors.Wrap(err, "awsModelID"), 0), nil
 	}
 
 	awsReq := &bedrockruntime.InvokeModelInput{
@@ -67,30 +67,30 @@ func Handler(c *gin.Context, awsCli *bedrockruntime.Client, meta *meta.Meta) (*r
 
 	claudeReq_, ok := c.Get(ctxkey.ConvertedRequest)
 	if !ok {
-		return utils.WrapErr(errors.New("request not found")), nil
+		return utils.WrapErr(errors.New("request not found"), 0), nil
 	}
 	claudeReq := claudeReq_.(*anthropic.Request)
 	awsClaudeReq := &Request{
 		AnthropicVersion: "bedrock-2023-05-31",
 	}
 	if err = copier.Copy(awsClaudeReq, claudeReq); err != nil {
-		return utils.WrapErr(errors.Wrap(err, "copy request")), nil
+		return utils.WrapErr(errors.Wrap(err, "copy request"), 0), nil
 	}
 
 	awsReq.Body, err = json.Marshal(awsClaudeReq)
 	if err != nil {
-		return utils.WrapErr(errors.Wrap(err, "marshal request")), nil
+		return utils.WrapErr(errors.Wrap(err, "marshal request"), 0), nil
 	}
 
 	awsResp, err := awsCli.InvokeModel(c.Request.Context(), awsReq)
 	if err != nil {
-		return utils.WrapErr(errors.Wrap(err, "InvokeModel")), nil
+		return utils.WrapErr(errors.Wrap(err, "InvokeModel"), 0), nil
 	}
 
 	claudeResponse := new(anthropic.Response)
 	err = json.Unmarshal(awsResp.Body, claudeResponse)
 	if err != nil {
-		return utils.WrapErr(errors.Wrap(err, "unmarshal response")), nil
+		return utils.WrapErr(errors.Wrap(err, "unmarshal response"), 0), nil
 	}
 
 	openaiResp := anthropic.ResponseClaude2OpenAI(claudeResponse, meta)
@@ -110,7 +110,7 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client, meta *meta.Met
 	createdTime := helper.GetTimestamp()
 	awsModelId, err := awsModelID(c.GetString(ctxkey.RequestModel))
 	if err != nil {
-		return utils.WrapErr(errors.Wrap(err, "awsModelID")), nil
+		return utils.WrapErr(errors.Wrap(err, "awsModelID"), 0), nil
 	}
 
 	awsReq := &bedrockruntime.InvokeModelWithResponseStreamInput{
@@ -121,7 +121,7 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client, meta *meta.Met
 
 	claudeReq_, ok := c.Get(ctxkey.ConvertedRequest)
 	if !ok {
-		return utils.WrapErr(errors.New("request not found")), nil
+		return utils.WrapErr(errors.New("request not found"), 0), nil
 	}
 	claudeReq := claudeReq_.(*anthropic.Request)
 
@@ -129,16 +129,16 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client, meta *meta.Met
 		AnthropicVersion: "bedrock-2023-05-31",
 	}
 	if err = copier.Copy(awsClaudeReq, claudeReq); err != nil {
-		return utils.WrapErr(errors.Wrap(err, "copy request")), nil
+		return utils.WrapErr(errors.Wrap(err, "copy request"), 0), nil
 	}
 	awsReq.Body, err = json.Marshal(awsClaudeReq)
 	if err != nil {
-		return utils.WrapErr(errors.Wrap(err, "marshal request")), nil
+		return utils.WrapErr(errors.Wrap(err, "marshal request"), 0), nil
 	}
 
 	awsResp, err := awsCli.InvokeModelWithResponseStream(c.Request.Context(), awsReq)
 	if err != nil {
-		return utils.WrapErr(errors.Wrap(err, "InvokeModelWithResponseStream")), nil
+		return utils.WrapErr(errors.Wrap(err, "InvokeModelWithResponseStream"), 0), nil
 	}
 	stream := awsResp.GetStream()
 	defer stream.Close()

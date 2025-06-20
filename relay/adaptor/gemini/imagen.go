@@ -7,26 +7,28 @@ import (
 
 func ConvertImagenRequest(request relaymodel.ImageRequest) (*ImageRequest, error) {
 	var contents []ChatContent
-	if request.Image != "" {
-		//图片编辑
-		mimeType, fileData, err := image.GetImageFromUrl(request.Image, false)
-		if err != nil {
-			return nil, err
-		}
-		contents = append(contents, ChatContent{
-			Role: "user",
-			Parts: []Part{
-				{
-					InlineData: &InlineData{
-						MimeType: mimeType,
-						Data:     fileData,
+	if len(request.Image) > 0 {
+		for _, img := range request.Image {
+			//图片编辑
+			mimeType, fileData, err := image.GetImageFromUrl(img, false)
+			if err != nil {
+				return nil, err
+			}
+			contents = append(contents, ChatContent{
+				Role: "user",
+				Parts: []Part{
+					{
+						InlineData: &InlineData{
+							MimeType: mimeType,
+							Data:     fileData,
+						},
+					},
+					{
+						Text: request.Prompt,
 					},
 				},
-				{
-					Text: request.Prompt,
-				},
-			},
-		})
+			})
+		}
 	} else {
 		//图片创建
 		if request.N > 1 {

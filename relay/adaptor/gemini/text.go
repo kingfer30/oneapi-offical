@@ -467,6 +467,10 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relay
 		}
 		data = strings.TrimPrefix(data, "data: ")
 		data = strings.TrimSuffix(data, "\"")
+
+		if config.DebugEnabled {
+			logger.SysLogf("Body: %s", data)
+		}
 		var geminiResponse ChatResponse
 		err := json.Unmarshal([]byte(data), &geminiResponse)
 		if err != nil {

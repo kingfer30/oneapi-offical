@@ -204,3 +204,26 @@ type OutputOptions struct {
 	MimeType           string `json:"mimeType,omitempty"`
 	CompressionQuality int    `json:"compressionQuality,omitempty"`
 }
+
+type RunningResultResponse struct {
+	Name string `json:"name,omitempty"`
+}
+
+type VideoResultResponse struct {
+	Name     string            `json:"name,omitempty"`
+	Done     bool              `json:"done,omitempty"`
+	Response *VideoJobResponse `json:"response,omitempty"`
+}
+type VideoJobResponse struct {
+	GenerateVideoResponse GenerateVideoResponse `json:"generateVideoResponse,omitempty"`
+}
+type GenerateVideoResponse struct {
+	GeneratedSamples []GeneratedSamples `json:"generatedSamples,omitempty"`
+}
+
+type GeneratedSamples struct {
+	Video VideoUrl `json:"video,omitempty"`
+}
+type VideoUrl struct {
+	Uri string `json:"uri,omitempty"`
+}

@@ -67,7 +67,7 @@ func (a *Adaptor) GetChannelName() string {
 	return "google palm"
 }
 
-func (a *Adaptor) ConvertVideoRequest(request *model.VideoRequest) (any, error) {
+func (a *Adaptor) ConvertVideoRequest(c *gin.Context, request *model.VideoRequest) (any, error) {
 	if request == nil {
 		return nil, errors.New("request is nil")
 	}

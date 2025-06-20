@@ -72,7 +72,7 @@ func ConvertRequest(textRequest relaymodel.GeneralOpenAIRequest) *Request {
 func Handler(c *gin.Context, awsCli *bedrockruntime.Client, modelName string) (*relaymodel.ErrorWithStatusCode, *relaymodel.Usage) {
 	awsModelId, err := awsModelID(c.GetString(ctxkey.RequestModel))
 	if err != nil {
-		return utils.WrapErr(errors.Wrap(err, "awsModelID")), nil
+		return utils.WrapErr(errors.Wrap(err, "awsModelID"), 0), nil
 	}
 
 	awsReq := &bedrockruntime.InvokeModelInput{
@@ -83,23 +83,23 @@ func Handler(c *gin.Context, awsCli *bedrockruntime.Client, modelName string) (*
 
 	llamaReq, ok := c.Get(ctxkey.ConvertedRequest)
 	if !ok {
-		return utils.WrapErr(errors.New("request not found")), nil
+		return utils.WrapErr(errors.New("request not found"), 0), nil
 	}
 
 	awsReq.Body, err = json.Marshal(llamaReq)
 	if err != nil {
-		return utils.WrapErr(errors.Wrap(err, "marshal request")), nil
+		return utils.WrapErr(errors.Wrap(err, "marshal request"), 0), nil
 	}
 
 	awsResp, err := awsCli.InvokeModel(c.Request.Context(), awsReq)
 	if err != nil {
-		return utils.WrapErr(errors.Wrap(err, "InvokeModel")), nil
+		return utils.WrapErr(errors.Wrap(err, "InvokeModel"), 0), nil
 	}
 
 	var llamaResponse Response
 	err = json.Unmarshal(awsResp.Body, &llamaResponse)
 	if err != nil {
-		return utils.WrapErr(errors.Wrap(err, "unmarshal response")), nil
+		return utils.WrapErr(errors.Wrap(err, "unmarshal response"), 0), nil
 	}
 
 	openaiResp := ResponseLlama2OpenAI(&llamaResponse)
@@ -142,7 +142,7 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 	createdTime := helper.GetTimestamp()
 	awsModelId, err := awsModelID(c.GetString(ctxkey.RequestModel))
 	if err != nil {
-		return utils.WrapErr(errors.Wrap(err, "awsModelID")), nil
+		return utils.WrapErr(errors.Wrap(err, "awsModelID"), 0), nil
 	}
 
 	awsReq := &bedrockruntime.InvokeModelWithResponseStreamInput{
@@ -153,17 +153,17 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 
 	llamaReq, ok := c.Get(ctxkey.ConvertedRequest)
 	if !ok {
-		return utils.WrapErr(errors.New("request not found")), nil
+		return utils.WrapErr(errors.New("request not found"), 0), nil
 	}
 
 	awsReq.Body, err = json.Marshal(llamaReq)
 	if err != nil {
-		return utils.WrapErr(errors.Wrap(err, "marshal request")), nil
+		return utils.WrapErr(errors.Wrap(err, "marshal request"), 0), nil
 	}
 
 	awsResp, err := awsCli.InvokeModelWithResponseStream(c.Request.Context(), awsReq)
 	if err != nil {
-		return utils.WrapErr(errors.Wrap(err, "InvokeModelWithResponseStream")), nil
+		return utils.WrapErr(errors.Wrap(err, "InvokeModelWithResponseStream"), 0), nil
 	}
 	stream := awsResp.GetStream()
 	defer stream.Close()

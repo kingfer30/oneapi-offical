@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -81,14 +82,47 @@ func BindMultipartForm(r *http.Request, dest interface{}) error {
 		if tag == "" {
 			tag = field.Name // 默认使用字段名
 		}
-		// 处理文件字段
-		if field.Type == reflect.TypeOf((*multipart.FileHeader)(nil)) {
-			file, header, err := r.FormFile(tag)
-			if err != nil {
-				return err
+		// 处理文件数组字段
+		if field.Type.Kind() == reflect.Slice && field.Type.Elem() == reflect.TypeOf((*multipart.FileHeader)(nil)) {
+			// 收集所有匹配字段名的文件
+			var files []*multipart.FileHeader
+			for key, headers := range r.MultipartForm.File {
+				// 匹配字段名加索引的形式 (如 "image[0]")
+				if strings.HasPrefix(key, tag+"[") && strings.HasSuffix(key, "]") {
+					files = append(files, headers...)
+				}
+				// 同时匹配无索引的字段名 (如 "image")
+				if key == tag {
+					files = append(files, headers...)
+				}
 			}
-			defer file.Close() // 关闭临时文件
-			fieldVal.Set(reflect.ValueOf(header))
+
+			// 按索引排序文件
+			sort.Slice(files, func(i, j int) bool {
+				// 这里可以添加更复杂的排序逻辑
+				return files[i].Filename < files[j].Filename
+			})
+
+			// 创建切片并填充
+			slice := reflect.MakeSlice(field.Type, len(files), len(files))
+			for idx, fh := range files {
+				slice.Index(idx).Set(reflect.ValueOf(fh))
+			}
+			fieldVal.Set(slice)
+			continue
+		}
+
+		// 处理单个文件字段（保持原逻辑）
+		if field.Type == reflect.TypeOf((*multipart.FileHeader)(nil)) {
+			_, header, err := r.FormFile(tag)
+			if err != nil {
+				// 允许文件不存在（非必填字段）
+				if err != http.ErrMissingFile {
+					return fmt.Errorf("field '%s' no exists : %v", tag, err)
+				}
+			} else {
+				fieldVal.Set(reflect.ValueOf(header))
+			}
 			continue
 		}
 
@@ -108,6 +142,15 @@ func BindMultipartForm(r *http.Request, dest interface{}) error {
 		case reflect.Bool:
 			boolVal, _ := strconv.ParseBool(values[0])
 			fieldVal.SetBool(boolVal)
+		case reflect.Slice:
+			// 处理文本数组字段
+			if field.Type.Elem().Kind() == reflect.String {
+				slice := reflect.MakeSlice(field.Type, len(values), len(values))
+				for i, v := range values {
+					slice.Index(i).SetString(v)
+				}
+				fieldVal.Set(slice)
+			}
 			// 可扩展其他类型...
 		}
 	}

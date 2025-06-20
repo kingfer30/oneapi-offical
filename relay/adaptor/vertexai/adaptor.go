@@ -116,7 +116,7 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 	return channelhelper.DoRequestHelper(a, c, meta, requestBody)
 }
 
-func (a *Adaptor) ConvertVideoRequest(request *model.VideoRequest) (any, error) {
+func (a *Adaptor) ConvertVideoRequest(c *gin.Context, request *model.VideoRequest) (any, error) {
 	if request == nil {
 		return nil, errors.New("request is nil")
 	}

@@ -48,7 +48,7 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 
 func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Meta) (usage *model.Usage, err *model.ErrorWithStatusCode) {
 	if a.awsAdapter == nil {
-		return nil, utils.WrapErr(errors.New("awsAdapter is nil"))
+		return nil, utils.WrapErr(errors.New("awsAdapter is nil"), 0)
 	}
 	return a.awsAdapter.DoResponse(c, a.AwsClient, meta)
 }
@@ -83,7 +83,7 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 	return nil, nil
 }
 
-func (a *Adaptor) ConvertVideoRequest(request *model.VideoRequest) (any, error) {
+func (a *Adaptor) ConvertVideoRequest(c *gin.Context, request *model.VideoRequest) (any, error) {
 	if request == nil {
 		return nil, errors.New("request is nil")
 	}

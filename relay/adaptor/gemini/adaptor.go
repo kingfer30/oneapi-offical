@@ -7,11 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common/config"
@@ -41,15 +38,14 @@ func (a *Adaptor) Init(meta *meta.Meta) {
 
 func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
 	defaultVersion := config.GeminiVersion
-	if meta.ActualModelName == "gemini-2.0-flash-exp" {
-		defaultVersion = "v1beta"
-	}
 
 	version := helper.AssignOrDefault(meta.Config.APIVersion, defaultVersion)
 	action := ""
 	switch meta.Mode {
 	case relaymode.Embeddings:
 		action = "batchEmbedContents"
+	case relaymode.VideoGenerations:
+		action = "predictLongRunning"
 	default:
 		action = "generateContent"
 	}
@@ -147,7 +143,6 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 	if err != nil {
 		return nil, fmt.Errorf("error reading body: %s", err)
 	}
-
 	requestBody = bytes.NewBuffer(bodyData)
 	fullRequestURL, err := a.GetRequestURL(meta)
 	if err != nil {
@@ -161,7 +156,7 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 	if err != nil {
 		return nil, fmt.Errorf("setup request header failed: %w", err)
 	}
-	resp, err := doRequest(c, req)
+	resp, err := DoRequest(c, req)
 	if err != nil {
 		return nil, fmt.Errorf("do request failed: %w", err)
 	}
@@ -193,125 +188,7 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 			}
 		}
 	}
-	if resp.StatusCode == http.StatusTooManyRequests {
-		//429的问题处理
-		defer resp.Body.Close()
-		requestBody, err := io.ReadAll(resp.Body)
-		if err == nil {
-			var geminiErr *GeminiErrorResponse
-			err = json.Unmarshal(requestBody, &geminiErr)
-			if err == nil && len(geminiErr.Error.Details) > 0 {
-				delay := 60
-				re := regexp.MustCompile(`\d+`)
-				exceedQuota := false
-				for _, detail := range geminiErr.Error.Details {
-					if detail.RetryDelay != "" {
-						num := re.FindString(detail.RetryDelay)
-						delay, _ = strconv.Atoi(num)
-						break
-					}
-					if strings.Contains(detail.Type, "QuotaFailure") && !c.GetBool("no_retry_high_tpm") {
-						exceedQuota = true
-					}
-				}
-				retry := false
-				if exceedQuota && IsLowTpmModel(meta.ActualModelName) && meta.TxtRequestCount <= 3 {
-					logger.SysLogf("[高Token重试] 当前请求TPM过高, 尝试新方法请求..")
-					meta.TxtRequestCount++
-					newRequest, err := ChangeChat2TxtRequest(c, *meta.TextRequest)
-					if err == nil {
-						jsonData, err := json.Marshal(newRequest)
-						if err == nil {
-							// logger.SysLogf("[高Token重试] body: %s", string(jsonData))
-							body := bytes.NewBuffer(jsonData)
-							resp, err = a.DoRequest(c, meta, body)
-							if err == nil {
-								retry = true
-							} else {
-								logger.SysLogf("[高Token重试] json.Marshal(newRequest): %s", err.Error())
-							}
-						} else {
-							logger.SysLogf("[高Token重试] json.Marshal(newRequest): %s", err.Error())
-						}
-					} else {
-						logger.SysLogf("[高Token重试] 执行异常, 将返回错误: %s", err)
-					}
-				}
-				if !retry {
-					openaiErr := openai.ErrorWrapper(
-						fmt.Errorf("Guo - Resource has been exhausted"),
-						"too_many_requests",
-						http.StatusTooManyRequests,
-					)
-					errData, err := json.Marshal(openaiErr)
-					if err == nil {
-						resp.Body = io.NopCloser(bytes.NewBuffer(errData))
-					} else {
-						resp.Body = io.NopCloser(bytes.NewBuffer(requestBody))
-					}
-					c.Set("gemini_delay", delay)
-				}
-			} else {
-				// if c.GetString("gemini-img-url") != "" {
-				// 	//图片生成, 且报错429, 尝试改为file模式
-				// 	imgUrl := c.GetString("gemini-img-url")
-				// 	fieldUrl := ""
-				// 	if strings.HasPrefix(imgUrl, "http") || strings.HasPrefix(imgUrl, "https") {
-				// 		fieldUrl = imgUrl
-				// 	} else {
-				// 		fieldUrl = random.StrToMd5(imgUrl)
-				// 	}
-				// 	common.RedisHashDel("image_url", random.StrToMd5(imgUrl))
-				// 	mimeType, fileName, err := image.GetImageFromUrl(imgUrl, true)
-				// 	if err == nil {
-				// 		_, fileData, err := FileHandler(c, fieldUrl, imgUrl, mimeType, fileName)
-				// 		if err == nil {
-				// 			image.UpdateImageCacheWithGeminiFile(imgUrl, fileData)
-				// 			logger.SysLogf("图片-429尝试生成Gemini-File - 成功: %s", fileData)
-				// 		}
-				// 	} else {
-				// 		logger.SysLogf("图片-429尝试生成Gemini-File - 错误: %s", err)
-				// 	}
-				// } else {
-				// 	//非图片模型, 报429的, 尝试使用官方的
-				// 	logger.SysLog("chat 429 尝试转官方lib中...")
-				// 	meta.SelfImplement = true
-				// }
-				resp.Body = io.NopCloser(bytes.NewBuffer(requestBody))
-			}
-		}
-	}
-	return resp, nil
-}
-func doRequest(c *gin.Context, req *http.Request) (*http.Response, error) {
-	var client *http.Client
-	if config.HttpProxy == "" {
-		var transport http.RoundTripper
-		client = &http.Client{
-			Timeout:   time.Duration(config.RelayGeminiTimeout) * time.Second,
-			Transport: transport,
-		}
-	} else {
-		url, err := url.Parse(config.HttpProxy)
-		if err != nil {
-			return nil, fmt.Errorf("url.Parse failed: %w", err)
-		}
-		client = &http.Client{
-			Timeout: time.Duration(config.RelayGeminiTimeout) * time.Second,
-			Transport: &http.Transport{
-				Proxy: http.ProxyURL(url),
-			},
-		}
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	if resp == nil {
-		return nil, errors.New("resp is nil")
-	}
-	_ = req.Body.Close()
-	_ = c.Request.Body.Close()
+
 	return resp, nil
 }
 
@@ -328,7 +205,9 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 	if c.GetBool("thinking_tag_block") {
 		meta.EnableBlockTag = true
 	}
-	if !meta.SelfImplement || meta.Mode == relaymode.Embeddings {
+	if meta.Mode == relaymode.VideoGenerations {
+		VideoHandler(c, resp, meta)
+	} else if !meta.SelfImplement || meta.Mode == relaymode.Embeddings {
 		//标记了流式 走流式输出
 		if meta.IsStream {
 			var responseText string
@@ -384,13 +263,15 @@ func (a *Adaptor) GetChannelName() string {
 	return "google gemini"
 }
 
-func ChatOnline(c *gin.Context, relayMode int, request *model.GeneralOpenAIRequest) {
-
-}
-
-func (a *Adaptor) ConvertVideoRequest(request *model.VideoRequest) (any, error) {
+func (a *Adaptor) ConvertVideoRequest(c *gin.Context, request *model.VideoRequest) (any, error) {
 	if request == nil {
 		return nil, errors.New("request is nil")
 	}
-	return request, nil
+	var geminiRequest *VideoRequest
+	var err error
+	geminiRequest, err = ConvertVideoRequest(c, request)
+	if err != nil {
+		return nil, err
+	}
+	return geminiRequest, nil
 }

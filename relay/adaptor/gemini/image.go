@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common"
+	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/image"
 	"github.com/songquanpeng/one-api/common/logger"
@@ -24,25 +25,28 @@ import (
 
 func ConvertImageRequest(request relaymodel.ImageRequest) (*ImageRequest, error) {
 	var contents []ChatContent
-	if request.Image != "" {
-		//图片编辑
-		mimeType, fileData, err := image.GetImageFromUrl(request.Image, false)
-		if err != nil {
-			return nil, err
+	if len(request.Image) > 0 {
+		logger.SysLogf("有图片! %d 张", len(request.Image))
+		var parts []Part
+		for _, img := range request.Image {
+			//图片编辑
+			mimeType, fileData, err := image.GetImageFromUrl(img, false)
+			if err != nil {
+				return nil, err
+			}
+			parts = append(parts, Part{
+				InlineData: &InlineData{
+					MimeType: mimeType,
+					Data:     fileData,
+				},
+			})
 		}
+		parts = append(parts, Part{
+			Text: request.Prompt,
+		})
 		contents = append(contents, ChatContent{
-			Role: "user",
-			Parts: []Part{
-				{
-					InlineData: &InlineData{
-						MimeType: mimeType,
-						Data:     fileData,
-					},
-				},
-				{
-					Text: request.Prompt,
-				},
-			},
+			Role:  "user",
+			Parts: parts,
 		})
 	} else {
 		//图片创建
@@ -102,6 +106,9 @@ func ImageStreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*
 		data = strings.TrimPrefix(data, "data: ")
 		data = strings.TrimSuffix(data, "\"")
 
+		if config.DebugEnabled {
+			logger.SysLogf("Body: %s", data)
+		}
 		var geminiResponse ChatResponse
 		err := json.Unmarshal([]byte(data), &geminiResponse)
 		if err != nil {
@@ -236,6 +243,10 @@ func ImageHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model.
 	if err != nil {
 		return openai.ErrorWrapper(err, "unmarshal_response_body_failed", http.StatusInternalServerError), nil
 	}
+
+	// if config.DebugEnabled {
+	// 	logger.SysLogf("Body: %s", string(responseBody))
+	// }
 
 	if len(geminiResponse.Candidates) == 0 {
 		return &relaymodel.ErrorWithStatusCode{

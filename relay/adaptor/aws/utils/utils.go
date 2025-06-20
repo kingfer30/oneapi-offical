@@ -6,9 +6,12 @@ import (
 	relaymodel "github.com/songquanpeng/one-api/relay/model"
 )
 
-func WrapErr(err error) *relaymodel.ErrorWithStatusCode {
+func WrapErr(err error, status int) *relaymodel.ErrorWithStatusCode {
+	if status == 0 {
+		status = http.StatusInternalServerError
+	}
 	return &relaymodel.ErrorWithStatusCode{
-		StatusCode: http.StatusInternalServerError,
+		StatusCode: status,
 		Error: relaymodel.Error{
 			Message: err.Error(),
 		},
