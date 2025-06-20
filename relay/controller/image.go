@@ -41,7 +41,6 @@ func getImageRequest(c *gin.Context, _ int) (*relaymodel.ImageRequest, error) {
 		if err != nil {
 			return nil, err
 		}
-		logger.SysLogf("转换成功, %s, %s, %d, %s", imageFormRequest.Model, imageFormRequest.Prompt, imageFormRequest.N, imageFormRequest.Size)
 		imageRequest.Model = imageFormRequest.Model
 		imageRequest.N = imageFormRequest.N
 		imageRequest.Prompt = imageFormRequest.Prompt
@@ -155,19 +154,56 @@ func validateImageRequest(imageRequest *relaymodel.ImageRequest, meta *meta.Meta
 	return nil
 }
 
-func getImageCostRatio(imageRequest *relaymodel.ImageRequest) (float64, error) {
+func getImageCostRatio(imageRequest *relaymodel.ImageRequest) (float64, string, error) {
 	if imageRequest == nil {
-		return 0, errors.New("imageRequest is nil")
+		return 0, "", errors.New("imageRequest is nil")
 	}
-	imageCostRatio := getImageSizeRatio(imageRequest.Model, imageRequest.Size)
-	if imageRequest.Quality == "hd" && imageRequest.Model == "dall-e-3" {
-		if imageRequest.Size == "1024x1024" {
-			imageCostRatio *= 2
-		} else {
-			imageCostRatio *= 1.5
+	var imageMode = "standard"
+	imageCostRatio := 1.0
+	if imageRequest.Model == "gpt-image-1" {
+		imageMode = "auto"
+		if strings.ToLower(imageRequest.Quality) == "high" {
+			imageMode = "high"
+			//hd mode
+			if imageRequest.Size == "1024x1024" {
+				imageCostRatio = 15.1818
+			} else if imageRequest.Size == "1024x1536" || imageRequest.Size == "1536x1024" {
+				imageCostRatio = 22.7272
+			} else {
+				imageCostRatio = 1
+			}
+		} else if strings.ToLower(imageRequest.Quality) == "low" {
+			imageMode = "low"
+			if imageRequest.Size == "1024x1536" || imageRequest.Size == "1536x1024" {
+				imageCostRatio = 1.4545
+			} else {
+				imageCostRatio = 1
+			}
+		} else if strings.ToLower(imageRequest.Quality) == "medium" {
+			imageMode = "medium"
+			//standard mode
+			if imageRequest.Size == "1024x1024" {
+				imageCostRatio = 3.8181
+			} else if imageRequest.Size == "1024x1536" || imageRequest.Size == "1536x1024" {
+				imageCostRatio = 5.7272
+			} else {
+				imageCostRatio = 1
+			}
 		}
+	} else if imageRequest.Model == "dall-e-3" {
+		if imageRequest.Quality == "hd" {
+			if imageRequest.Size == "1024x1024" {
+				imageCostRatio = 2
+			} else if imageRequest.Size == "1024x1792" || imageRequest.Size == "1792x1024" {
+				imageCostRatio = 3
+			} else {
+				imageCostRatio = 2
+			}
+		}
+	} else {
+		imageCostRatio *= getImageSizeRatio(imageRequest.Model, imageRequest.Size)
 	}
-	return imageCostRatio, nil
+	return imageCostRatio, imageMode, nil
 }
 
 func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatusCode {
@@ -191,7 +227,7 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		return bizErr
 	}
 
-	imageCostRatio, err := getImageCostRatio(imageRequest)
+	imageCostRatio, imageMode, err := getImageCostRatio(imageRequest)
 	if err != nil {
 		return openai.ErrorWrapper(err, "get_image_cost_ratio_failed", http.StatusInternalServerError)
 	}
@@ -294,6 +330,13 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 				//gemini按照正常chat计费
 				quota = int64(math.Ceil((float64(prompt) + float64(completion)*completionRatio) * ratio))
 			}
+			if imageRequest.Model == "gpt-image-1" {
+				prompt = usage.InputTokens
+				completion = usage.OutputTokens
+				logger.SysLogf("prompt:%v, completion:%v", prompt, completion)
+				quota = int64(prompt) + int64(float64(completion)*completionRatio)
+				quota = int64(float64(quota) * modelRatio)
+			}
 			if usage.TotalTokens > int(quota) {
 				quota = int64(usage.TotalTokens)
 			}
@@ -308,8 +351,8 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		}
 		if quota != 0 {
 			tokenName := c.GetString(ctxkey.TokenName)
-			logContent := fmt.Sprintf("模型倍率 %.2f，分组倍率 %.2f", modelRatio, groupRatio)
-			model.RecordConsumeLog(ctx, meta.UserId, meta.ChannelId, prompt, completion, imageRequest.Model, tokenName, quota, logContent)
+			logContent := fmt.Sprintf("model rate %.2f, size radio %.2f, group rate %.2f (%s-%s)", modelRatio, imageCostRatio, groupRatio, imageRequest.Size, imageMode)
+			model.RecordConsumeLog(ctx, meta.UserId, meta.ChannelId, prompt, completion, imageRequest.Model, tokenName, quota, logContent, meta.TokenId)
 			model.UpdateUserUsedQuotaAndRequestCount(meta.UserId, quota)
 			channelId := c.GetInt(ctxkey.ChannelId)
 			model.UpdateChannelUsedQuota(channelId, quota)

@@ -38,6 +38,11 @@ var ImageSizeRatios = map[string]map[string]float64{
 		"1280x800":  1,
 		"800x1280":  1,
 	},
+	"gpt-image-1": {
+		"1024x1024": 1,
+		"1536x1024": 1.4545,
+		"1024x1536": 1.4545,
+	},
 }
 
 var ImageGenerationAmounts = map[string][2]int{

@@ -227,7 +227,7 @@ func RelayVideoHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		if quota != 0 {
 			tokenName := c.GetString(ctxkey.TokenName)
 			logContent := fmt.Sprintf("%s模型倍率 %.2f，分组倍率 %.2f", extendLog, modelRatio, groupRatio)
-			model.RecordConsumeLog(ctx, meta.UserId, meta.ChannelId, prompt, completion, videoRequest.Model, tokenName, quota, logContent)
+			model.RecordConsumeLog(ctx, meta.UserId, meta.ChannelId, prompt, completion, videoRequest.Model, tokenName, quota, logContent, meta.TokenId)
 			model.UpdateUserUsedQuotaAndRequestCount(meta.UserId, quota)
 			channelId := c.GetInt(ctxkey.ChannelId)
 			model.UpdateChannelUsedQuota(channelId, quota)

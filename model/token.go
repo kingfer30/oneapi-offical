@@ -83,10 +83,10 @@ func ValidateUserToken(c *gin.Context, key string) (token *Token, err error) {
 	}
 	token, err = CacheGetTokenByKey(key, false)
 	if err != nil {
-		logger.SysError("CacheGetTokenByKey failed: " + err.Error())
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("invalid token")
 		}
+		logger.SysError("CacheGetTokenByKey failed: " + err.Error())
 		return nil, errors.New("failed to check key.")
 	}
 	var keyText = helper.EncryptKey(token.Key)
