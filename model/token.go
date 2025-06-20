@@ -50,7 +50,8 @@ type Token struct {
 	ModerationsNum      int     `json:"moderations_num" gorm:"default:0"`
 	LastModerationsTime int64   `json:"last_moderations_time" gorm:"bigint"`
 
-	BatchNumber int `gorm:"-"`
+	//标记为忽略数据库
+	BatchNumber int `json:"batch_number" gorm:"-"`
 }
 
 func GetAllUserTokens(userId int, startIdx int, num int, order string) ([]*Token, error) {

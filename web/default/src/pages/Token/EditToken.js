@@ -77,6 +77,7 @@ const EditToken = () => {
     setLoading(false);
   };
   useEffect(() => {
+    setExpiredTime(1, 0, 0, 0)
     if (isEdit) {
       loadToken().then();
     }
@@ -130,11 +131,11 @@ const EditToken = () => {
         showSuccess('令牌更新成功！');
       } else {
         showSuccess('令牌创建成功，请在列表页面点击复制获取令牌！');
-        setInputs(originInputs);
       }
     } else {
       showError(message);
     }
+    setInputs(originInputs);
   };
 
   return (
@@ -251,34 +252,6 @@ const EditToken = () => {
             </Form.Field>
           ) : <></>}
           <Form.Field>
-            <Form.Dropdown
-              label='模型范围'
-              placeholder={'请选择允许使用的模型，留空则不进行限制'}
-              name='models'
-              fluid
-              multiple
-              search
-              onLabelClick={(e, { value }) => {
-                copy(value).then();
-              }}
-              selection
-              onChange={handleInputChange}
-              value={inputs.models}
-              autoComplete='new-password'
-              options={modelOptions}
-            />
-          </Form.Field>
-          <Form.Field>
-            <Form.Input
-              label='IP 限制'
-              name='subnet'
-              placeholder={'请输入允许访问的网段，例如：192.168.0.0/24，请使用英文逗号分隔多个网段'}
-              onChange={handleInputChange}
-              value={inputs.subnet}
-              autoComplete='new-password'
-            />
-          </Form.Field>
-          <Form.Field>
             <Form.Input
               label='过期时间'
               name='expired_time'
@@ -306,6 +279,35 @@ const EditToken = () => {
               setExpiredTime(0, 0, 0, 1);
             }}>一分钟后过期</Button>
           </div>
+          
+          <Form.Field>
+            <Form.Dropdown
+              label='模型范围'
+              placeholder={'请选择允许使用的模型，留空则不进行限制'}
+              name='models'
+              fluid
+              multiple
+              search
+              onLabelClick={(e, { value }) => {
+                copy(value).then();
+              }}
+              selection
+              onChange={handleInputChange}
+              value={inputs.models}
+              autoComplete='new-password'
+              options={modelOptions}
+            />
+          </Form.Field>
+          <Form.Field>
+            <Form.Input
+              label='IP 限制'
+              name='subnet'
+              placeholder={'请输入允许访问的网段，例如：192.168.0.0/24，请使用英文逗号分隔多个网段'}
+              onChange={handleInputChange}
+              value={inputs.subnet}
+              autoComplete='new-password'
+            />
+          </Form.Field>
           <Form.Checkbox
                 checked={moderations_enable}
                 label='开启内容审核(针对OpenAI渠道)'

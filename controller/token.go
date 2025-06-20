@@ -172,7 +172,7 @@ func AddToken(c *gin.Context) {
 		for i := 0; i < token.BatchNumber; i++ {
 			cleanToken := model.Token{
 				UserId:            c.GetInt(ctxkey.Id),
-				Name:              token.Name + "-" + date,
+				Name:              token.Name + "-" + date + "-" + strconv.Itoa(i+1),
 				Key:               random.GenerateKey(),
 				CreatedTime:       helper.GetTimestamp(),
 				AccessedTime:      helper.GetTimestamp(),
