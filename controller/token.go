@@ -113,7 +113,7 @@ func validateToken(c *gin.Context, token model.Token) error {
 	if len(token.Name) > 30 {
 		return fmt.Errorf("Token name is too long")
 	}
-	if token.BatchNumber <= 0 {
+	if token.Id <= 0 && token.BatchNumber <= 0 {
 		return fmt.Errorf("BatchNumber can not lower than zero")
 	}
 	if token.Subnet != nil && *token.Subnet != "" {
