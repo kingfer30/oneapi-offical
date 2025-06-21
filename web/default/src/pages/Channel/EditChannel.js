@@ -3,7 +3,7 @@ import { Button, Form, Header, Input, Message, Segment } from 'semantic-ui-react
 import { useNavigate, useParams } from 'react-router-dom';
 import { API, copy, getChannelModels, showError, showInfo, showSuccess, verifyJSON } from '../../helpers';
 import { CHANNEL_OPTIONS } from '../../constants';
-import {  renderQuotaWithPrompt } from '../../helpers/render';
+import { renderQuotaWithPrompt } from '../../helpers/render';
 
 const MODEL_MAPPING_EXAMPLE = {
   'gpt-3.5-turbo-0301': 'gpt-3.5-turbo',
@@ -50,6 +50,7 @@ const EditChannel = () => {
     groups: ['default'],
     organization: '',
     soft_limit_usd: 0,
+    calc_prompt: true,
   };
   const [restock, setRestock] = useState(false);
   const [batch, setBatch] = useState(false);
@@ -82,6 +83,10 @@ const EditChannel = () => {
 
   const handleConfigChange = (e, { name, value }) => {
     setConfig((inputs) => ({ ...inputs, [name]: value }));
+  };
+  
+  const setCalcPrompt = () => {
+    setInputs({ ...inputs, calc_prompt: !inputs.calc_prompt });
   };
 
   const loadChannel = async () => {
@@ -199,7 +204,7 @@ const EditChannel = () => {
     localInputs.models = localInputs.models.join(',');
     localInputs.group = localInputs.groups.join(',');
     localInputs.config = JSON.stringify(config);
-    localInputs.soft_limit_usd=parseInt(localInputs.soft_limit_usd)
+    localInputs.soft_limit_usd = parseInt(localInputs.soft_limit_usd)
     if (isEdit) {
       res = await API.put(`/api/channel/`, { ...localInputs, id: parseInt(channelId) });
     } else {
@@ -468,29 +473,29 @@ const EditChannel = () => {
                 />
               </Form.Field>
               {
-            inputs.type === 1 ?
-              <Form.Field>
-                <Form.Input
-                  label='组织id(OpenAI)'
-                  name='organization'
-                  placeholder={'请输入组织OpenAI的组织id: org-xxx'}
-                  onChange={handleInputChange}
-                  value={inputs.organization}
-                  autoComplete='new-password'
-                />
-              </Form.Field> : <></>
-          }
-          {
-              <Form.Field>
-                <Form.Input
-                  label={`额度限制${renderQuotaWithPrompt(inputs.soft_limit_usd)}`}
-                  name='soft_limit_usd'
-                  placeholder={'请输入额度限制'}
-                  onChange={handleInputChange}
-                  value={inputs.soft_limit_usd}
-                />
-              </Form.Field> 
-          }
+                inputs.type === 1 ?
+                  <Form.Field>
+                    <Form.Input
+                      label='组织id(OpenAI)'
+                      name='organization'
+                      placeholder={'请输入组织OpenAI的组织id: org-xxx'}
+                      onChange={handleInputChange}
+                      value={inputs.organization}
+                      autoComplete='new-password'
+                    />
+                  </Form.Field> : <></>
+              }
+              {
+                <Form.Field>
+                  <Form.Input
+                    label={`额度限制${renderQuotaWithPrompt(inputs.soft_limit_usd)}`}
+                    name='soft_limit_usd'
+                    placeholder={'请输入额度限制'}
+                    onChange={handleInputChange}
+                    value={inputs.soft_limit_usd}
+                  />
+                </Form.Field>
+              }
             </>
             )
           }
@@ -588,20 +593,29 @@ const EditChannel = () => {
             inputs.type === 24 && (
               <div style={{ lineHeight: '40px', marginBottom: '12px' }}>
                 <Button type={'button'} onClick={() => {
-                  config.api_version="v1"
+                  config.api_version = "v1"
                   handleInputChange(null, config);
                 }}>v1</Button>
                 <Button type={'button'} onClick={() => {
-                  config.api_version="v1beta"
+                  config.api_version = "v1beta"
                   handleInputChange(null, config);
                 }}>v1beta</Button>
                 <Button type={'button'} onClick={() => {
-                  config.api_version="v1alpha"
+                  config.api_version = "v1alpha"
                   handleInputChange(null, config);
                 }}>v1alpha</Button>
               </div>
             )
           }
+          <Form.Field>
+            <Form.Checkbox
+              checked={inputs.calc_prompt}
+              label='是否计算Prompt, 是则预先计算Prompt以判断是否余额不足, 在高并发场景下会影响性能, 默认开启, 可在如gemini自带返回usage模型关闭该选项'
+              name='calc_prompt'
+              value={inputs.calc_prompt}
+              onChange={() =>setCalcPrompt()}
+            />
+          </Form.Field>
           {
             inputs.type !== 33 && inputs.type !== 42 && (batch ? <Form.Field>
               <Form.TextArea

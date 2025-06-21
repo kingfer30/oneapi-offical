@@ -45,6 +45,7 @@ type Meta struct {
 	Image2Chat       bool
 	TextRequest      *relaymodel.GeneralOpenAIRequest
 	TxtRequestCount  int
+	CalcPrompt       bool
 }
 
 func GetByContext(c *gin.Context) *Meta {
@@ -63,6 +64,7 @@ func GetByContext(c *gin.Context) *Meta {
 		RequestURLPath:  c.Request.URL.String(),
 		SystemPrompt:    c.GetString(ctxkey.SystemPrompt),
 		SelfImplement:   false,
+		CalcPrompt:      c.GetBool(ctxkey.CalcPrompt),
 	}
 	cfg, ok := c.Get(ctxkey.Config)
 	if ok {

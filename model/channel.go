@@ -52,7 +52,7 @@ type Channel struct {
 	DpmLimit           int     `json:"dpm_limit" gorm:"default:0"`
 	TpmLimit           int     `json:"tpm_limit" gorm:"default:0"`
 	SoftLimitUsd       int     `json:"soft_limit_usd" gorm:"default:0;index:idx_soft_limit_usd"`
-	CalcPrompt         bool    `json:"calc_prompt" gorm:"default:1"`
+	CalcPrompt         *bool   `json:"calc_prompt" gorm:"default:1"`
 
 	// 新增字段，记录被禁用的模型
 	SleepModels map[string]int64 `gorm:"-"` // 标记为忽略数据库

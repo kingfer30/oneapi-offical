@@ -46,8 +46,8 @@ func RelayTextHelper(c *gin.Context) *model.ErrorWithStatusCode {
 	ratio := modelRatio * groupRatio
 	// pre-consume quota
 	var promptTokens int
-	//gemini不作计算了, 为了不触发token_counter
-	if meta.APIType == apitype.Gemini {
+	//部分渠道例如 gemini不作计算, 它自带返回 为了不触发token_counter
+	if meta.CalcPrompt {
 		promptTokens = 0
 	} else {
 		promptTokens = getPromptTokens(textRequest, meta.Mode)
