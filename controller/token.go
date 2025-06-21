@@ -271,14 +271,25 @@ func UpdateToken(c *gin.Context) {
 	}
 	if statusOnly != "" {
 		cleanToken.Status = token.Status
+		cleanToken.ExhaustedAlert = 0
+		cleanToken.ExpiredAlert = 0
 	} else {
 		// If you add more fields, please also update token.Update()
 		cleanToken.Name = token.Name
 		cleanToken.ExpiredTime = token.ExpiredTime
 		cleanToken.RemainQuota = token.RemainQuota
 		cleanToken.UnlimitedQuota = token.UnlimitedQuota
-		cleanToken.Models = token.Models
-		cleanToken.Subnet = token.Subnet
+		cleanToken.HardLimitUsd = cleanToken.UsedQuota + cleanToken.RemainQuota
+		cleanToken.RpmLimit = token.RpmLimit
+		cleanToken.TpmLimit = token.TpmLimit
+		cleanToken.DpmLimit = token.DpmLimit
+		cleanToken.Email = token.Email
+		cleanToken.CustomContact = token.CustomContact
+		cleanToken.ModerationsEnable = token.ModerationsEnable
+		if token.RechargeQuota > 0 {
+			cleanToken.RemainQuota += int64(token.RechargeQuota * 500000)
+			cleanToken.HardLimitUsd += int64(token.RechargeQuota * 500000)
+		}
 	}
 	err = cleanToken.Update()
 	if err != nil {

@@ -51,7 +51,8 @@ type Token struct {
 	LastModerationsTime int64   `json:"last_moderations_time" gorm:"bigint"`
 
 	//标记为忽略数据库
-	BatchNumber int `json:"batch_number" gorm:"-"`
+	BatchNumber   int `json:"batch_number" gorm:"-"`
+	RechargeQuota int `json:"recharge_quota"  gorm:"-"`
 }
 
 func GetAllUserTokens(userId int, startIdx int, num int, order string) ([]*Token, error) {
@@ -152,6 +153,10 @@ func (t *Token) Insert() error {
 func (t *Token) Update() error {
 	err := DB.Model(t).Select("name", "status", "expired_time", "remain_quota", "hard_limit_usd", "unlimited_quota", "rpm_limit", "dpm_limit", "tpm_limit",
 		"custom_contact", "email", "moderations_enable", "expired_alert", "exhausted_alert", "models", "subnet").Updates(t).Error
+	if common.RedisEnabled {
+		common.RedisDel(fmt.Sprintf("Auth_Error:sk-%s", t.Key))
+		common.RedisDel(fmt.Sprintf("token:%s", t.Key))
+	}
 	return err
 }
 
