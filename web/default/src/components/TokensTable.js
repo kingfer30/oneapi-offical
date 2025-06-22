@@ -7,6 +7,7 @@ import { ITEMS_PER_PAGE } from '../constants';
 import { renderQuota } from '../helpers/render';
 
 const COPY_OPTIONS = [
+  { key: 'key', text: '纯Key', value: 'key' },
   { key: 'next', text: 'ChatGPT Next Web', value: 'next' },
   { key: 'ama', text: 'BotGem', value: 'ama' },
   { key: 'opencat', text: 'OpenCat', value: 'opencat' },
@@ -378,7 +379,7 @@ const TokensTable = () => {
                             await onCopy('', token.key, token.expired_time);
                           }}
                         >
-                          复制
+                          复制商城格式
                         </Button>
                         <Dropdown
                           className='button icon'
@@ -414,6 +415,7 @@ const TokensTable = () => {
                           trigger={<></>}
                         />
                       </Button.Group>
+                      {' '}
                       <Button.Group color='blue' size={'small'}>
                         <Button
                             size={'small'}
