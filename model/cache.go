@@ -183,8 +183,12 @@ func InitChannelCache() {
 func InitChannelCacheByMem() {
 	var channels []*Channel
 	DB.Where("status = ?", ChannelStatusEnabled).Find(&channels)
+	if config.ChannelBaseUrlList == nil {
+		config.ChannelBaseUrlList = make(map[int]string)
+	}
 	for _, channel := range channels {
 		channel.SleepModels = make(map[string]int64)
+		config.ChannelBaseUrlList[channel.Id] = *channel.BaseURL
 	}
 	var abilities []*Ability
 	DB.Find(&abilities)

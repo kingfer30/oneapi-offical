@@ -11,12 +11,13 @@ import (
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/logger"
+	"github.com/songquanpeng/one-api/service"
 )
 
 func abortWithMessage(c *gin.Context, statusCode int, message string, needCache bool) {
 	res := gin.H{
 		"error": gin.H{
-			"message": helper.MessageWithRequestId(message, c.GetString(helper.RequestIdKey)),
+			"message": service.RenderMessage(message, c.GetString(helper.RequestIdKey)),
 			"type":    "guoguo_api_error",
 		},
 	}

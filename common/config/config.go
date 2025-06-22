@@ -38,6 +38,9 @@ var SessionSecret = uuid.New().String()
 var OptionMap map[string]string
 var OptionMapRWMutex sync.RWMutex
 
+// 记录渠道的所有url
+var ChannelBaseUrlList map[int]string
+
 var ItemsPerPage = 10
 var MaxRecentItems = 100
 

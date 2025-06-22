@@ -19,6 +19,7 @@ import (
 	"github.com/songquanpeng/one-api/relay/controller"
 	"github.com/songquanpeng/one-api/relay/model"
 	"github.com/songquanpeng/one-api/relay/relaymode"
+	"github.com/songquanpeng/one-api/service"
 )
 
 // https://platform.openai.com/docs/api-reference/chat
@@ -117,7 +118,7 @@ func Relay(c *gin.Context) {
 		// }
 
 		// BUG: bizErr is in race condition
-		bizErr.Error.Message = helper.MessageWithRequestId(bizErr.Error.Message, requestId)
+		bizErr.Error.Message = service.RenderMessage(bizErr.Error.Message, requestId)
 		c.JSON(bizErr.StatusCode, gin.H{
 			"error": bizErr.Error,
 		})

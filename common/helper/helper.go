@@ -127,13 +127,6 @@ func AssignOrDefault(value string, defaultValue string) string {
 	return defaultValue
 }
 
-func MessageWithRequestId(message string, id string) string {
-	if strings.Contains(message, "(request id:") {
-		return message
-	}
-	return fmt.Sprintf("%s (request id: %s)", message, id)
-}
-
 func String2Int(str string) int {
 	num, err := strconv.Atoi(str)
 	if err != nil {
