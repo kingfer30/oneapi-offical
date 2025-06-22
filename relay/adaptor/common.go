@@ -55,3 +55,7 @@ func DoRequest(c *gin.Context, req *http.Request) (*http.Response, error) {
 	_ = c.Request.Body.Close()
 	return resp, nil
 }
+
+func StartingStream(c *gin.Context, meta *meta.Meta) {
+	meta.SetFirstResponseTime()
+}

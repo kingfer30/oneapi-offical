@@ -53,7 +53,7 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Meta) (usage *model.Usage, err *model.ErrorWithStatusCode) {
 	var responseText *string
 	if meta.IsStream {
-		err, responseText = StreamHandler(c, resp)
+		err, responseText = StreamHandler(c, resp, meta)
 	} else {
 		err, responseText = Handler(c, resp, meta.PromptTokens, meta.ActualModelName)
 	}

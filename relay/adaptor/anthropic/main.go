@@ -15,6 +15,7 @@ import (
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/image"
 	"github.com/songquanpeng/one-api/common/logger"
+	"github.com/songquanpeng/one-api/relay/adaptor"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
@@ -370,6 +371,7 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model
 	var completionTokens int
 
 	for scanner.Scan() {
+		adaptor.StartingStream(c, meta)
 		data := scanner.Text()
 		if len(data) < 6 || !strings.HasPrefix(data, "data:") {
 			continue

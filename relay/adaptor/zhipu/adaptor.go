@@ -99,7 +99,7 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 
 func (a *Adaptor) DoResponseV4(c *gin.Context, resp *http.Response, meta *meta.Meta) (usage *model.Usage, err *model.ErrorWithStatusCode) {
 	if meta.IsStream {
-		err, _, usage = openai.StreamHandler(c, resp, meta.Mode)
+		err, _, usage = openai.StreamHandler(c, resp, meta)
 	} else {
 		err, usage = openai.Handler(c, resp, meta.PromptTokens, meta.ActualModelName)
 	}
@@ -119,7 +119,7 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 		return a.DoResponseV4(c, resp, meta)
 	}
 	if meta.IsStream {
-		err, usage = StreamHandler(c, resp)
+		err, usage = StreamHandler(c, resp, meta)
 	} else {
 		if meta.Mode == relaymode.Embeddings {
 			err, usage = EmbeddingsHandler(c, resp)

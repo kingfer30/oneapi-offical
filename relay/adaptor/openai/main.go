@@ -14,6 +14,8 @@ import (
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/conv"
 	"github.com/songquanpeng/one-api/common/logger"
+	"github.com/songquanpeng/one-api/relay/adaptor"
+	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
 	"github.com/songquanpeng/one-api/relay/relaymode"
 )
@@ -24,7 +26,7 @@ const (
 	dataPrefixLength = len(dataPrefix)
 )
 
-func StreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*model.ErrorWithStatusCode, string, *model.Usage) {
+func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model.ErrorWithStatusCode, string, *model.Usage) {
 	responseText := ""
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(bufio.ScanLines)
@@ -34,6 +36,7 @@ func StreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*model.E
 
 	doneRendered := false
 	for scanner.Scan() {
+		adaptor.StartingStream(c, meta)
 		data := scanner.Text()
 		if len(data) < dataPrefixLength { // ignore blank line or wrong format
 			continue
@@ -46,7 +49,7 @@ func StreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*model.E
 			doneRendered = true
 			continue
 		}
-		switch relayMode {
+		switch meta.Mode {
 		case relaymode.ChatCompletions:
 			var streamResponse ChatCompletionsStreamResponse
 			err := json.Unmarshal([]byte(data[dataPrefixLength:]), &streamResponse)

@@ -14,7 +14,9 @@ import (
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/logger"
+	"github.com/songquanpeng/one-api/relay/adaptor"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
+	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
 )
 
@@ -28,7 +30,7 @@ func ConvertCompletionsRequest(textRequest model.GeneralOpenAIRequest) *Request 
 	}
 }
 
-func StreamHandler(c *gin.Context, resp *http.Response, promptTokens int, modelName string) (*model.ErrorWithStatusCode, *model.Usage) {
+func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model.ErrorWithStatusCode, *model.Usage) {
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(bufio.ScanLines)
 
@@ -38,6 +40,7 @@ func StreamHandler(c *gin.Context, resp *http.Response, promptTokens int, modelN
 	var responseText string
 
 	for scanner.Scan() {
+		adaptor.StartingStream(c, meta)
 		data := scanner.Text()
 		if len(data) < len("data: ") {
 			continue
@@ -60,7 +63,7 @@ func StreamHandler(c *gin.Context, resp *http.Response, promptTokens int, modelN
 			responseText += v.Delta.StringContent()
 		}
 		response.Id = id
-		response.Model = modelName
+		response.Model = meta.ActualModelName
 		err = render.ObjectData(c, response)
 		if err != nil {
 			logger.SysError(err.Error())
@@ -78,7 +81,7 @@ func StreamHandler(c *gin.Context, resp *http.Response, promptTokens int, modelN
 		return openai.ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), nil
 	}
 
-	usage := openai.ResponseText2Usage(responseText, responseModel, promptTokens)
+	usage := openai.ResponseText2Usage(responseText, responseModel, meta.PromptTokens)
 	return nil, usage
 }
 

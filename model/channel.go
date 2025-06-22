@@ -11,6 +11,7 @@ import (
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/message"
+	relaymodel "github.com/songquanpeng/one-api/relay/model"
 	"gorm.io/gorm"
 )
 
@@ -57,18 +58,6 @@ type Channel struct {
 	SleepLock   sync.RWMutex     `gorm:"-"` // 锁也不需要持久化
 }
 
-type ChannelConfig struct {
-	Region            string `json:"region,omitempty"`
-	SK                string `json:"sk,omitempty"`
-	AK                string `json:"ak,omitempty"`
-	UserID            string `json:"user_id,omitempty"`
-	APIVersion        string `json:"api_version,omitempty"`
-	LibraryID         string `json:"library_id,omitempty"`
-	Plugin            string `json:"plugin,omitempty"`
-	VertexAIProjectID string `json:"vertex_ai_project_id,omitempty"`
-	VertexAIADC       string `json:"vertex_ai_adc,omitempty"`
-}
-
 func GetAllChannels(startIdx int, num int, scope string) ([]*Channel, error) {
 	var channels []*Channel
 	var err error
@@ -111,6 +100,8 @@ func BatchInsertChannels(channels []Channel) error {
 			return err
 		}
 	}
+	//更新缓存
+	InitChannelCache()
 	return nil
 }
 
@@ -159,6 +150,8 @@ func (channel *Channel) Update() error {
 	}
 	DB.Model(channel).First(channel, "id = ?", channel.Id)
 	err = channel.UpdateAbilities()
+	//更新缓存
+	InitChannelCache()
 	return err
 }
 
@@ -189,11 +182,13 @@ func (channel *Channel) Delete() error {
 		return err
 	}
 	err = channel.DeleteAbilities()
+	//更新缓存
+	InitChannelCache()
 	return err
 }
 
-func (channel *Channel) LoadConfig() (ChannelConfig, error) {
-	var cfg ChannelConfig
+func (channel *Channel) LoadConfig() (relaymodel.ChannelConfig, error) {
+	var cfg relaymodel.ChannelConfig
 	if channel.Config == "" {
 		return cfg, nil
 	}
@@ -248,6 +243,7 @@ func ActivateChannel(limit int64) bool {
 		logger.SysErrorf("ActivateChannel - failed to scan channel status: %s", err)
 		return false
 	}
+	isAdd := false
 	for _, record := range data {
 		num := record["num"].(int64)
 		t := record["type"].(int64)
@@ -270,8 +266,13 @@ func ActivateChannel(limit int64) bool {
 			if res.Error != nil {
 				logger.SysErrorf("ActivateChannel - failed to update channel status: %s", res.Error)
 			}
+			isAdd = true
 			logger.SysLogf("Task - ActivateChannel - update channel status, group: %s, type: %d, count: %d", g, t, res.RowsAffected)
 		}
+	}
+	if isAdd {
+		//更新缓存
+		InitChannelCache()
 	}
 	return true
 }

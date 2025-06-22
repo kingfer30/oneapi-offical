@@ -19,6 +19,7 @@ import (
 	"github.com/songquanpeng/one-api/common/image"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/random"
+	"github.com/songquanpeng/one-api/relay/adaptor"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/constant"
 	"github.com/songquanpeng/one-api/relay/meta"
@@ -460,6 +461,7 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relay
 
 	common.SetEventStreamHeaders(c)
 	for scanner.Scan() {
+		adaptor.StartingStream(c, meta)
 		data := scanner.Text()
 		data = strings.TrimSpace(data)
 		if !strings.HasPrefix(data, "data: ") {

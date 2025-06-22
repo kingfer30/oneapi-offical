@@ -84,7 +84,7 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 
 func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Meta) (usage *model.Usage, err *model.ErrorWithStatusCode) {
 	if meta.IsStream {
-		err, usage = StreamHandler(c, resp, meta.PromptTokens, meta.ActualModelName)
+		err, usage = StreamHandler(c, resp, meta)
 	} else {
 		err, usage = Handler(c, resp, meta.PromptTokens, meta.ActualModelName)
 	}

@@ -220,7 +220,7 @@ func getImageFormat(input string, saveLocal bool) (string, string, error) {
 	var imageData []byte
 	imageData, err = base64.StdEncoding.DecodeString(input)
 	if err != nil {
-		logger.SysLogf("Vision-Base64方式-DecodeString报错: %s->%s", input, err.Error())
+		logger.SysLogf("ImageFormat方式-DecodeString报错: %s->%s", input, err.Error())
 		return "", "", err
 	}
 
@@ -248,12 +248,14 @@ func getImageFormat(input string, saveLocal bool) (string, string, error) {
 		t = "gif"
 	}
 	if t == "" {
+		logger.SysLogf("ImageFormat方式-DetectContentType报错: unsupported image format->%s", contentType)
 		return "", "", fmt.Errorf("unsupported image format: %s", contentType)
 	}
 	if saveLocal {
 		//保存到本地文件
 		file, err := SaveWithStream(input, t)
 		if err != nil {
+			logger.SysLogf("ImageFormat方式-SaveWithStream报错: fail to SaveWithStream->%s", err)
 			return "", "", fmt.Errorf("fail to SaveWithStream: %s", err)
 		}
 		setImageCache(source, true, contentType, 0, 0, file)
@@ -317,8 +319,13 @@ func GetImageFromUrl(url string, saveLocal bool) (mimeType string, data string, 
 		data = imgData
 		return imgType, data, nil
 	}
+	if imgType == "" && imgData == "" && err != nil {
+		//base64格式化错误返回
+		return "", "", err
+	}
 	isImage, contentType, err := IsImageUrl(url)
 	if !isImage && err == nil {
+		logger.SysLogf("failed to get this url : it may not an image")
 		return "", "", fmt.Errorf("failed to get this url : it may not an image")
 	}
 	resp, err := client.UserContentRequestHTTPClient.Get(url)

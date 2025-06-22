@@ -16,6 +16,7 @@ import (
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/random"
 	"github.com/songquanpeng/one-api/common/render"
+	"github.com/songquanpeng/one-api/relay/adaptor"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/constant"
 	"github.com/songquanpeng/one-api/relay/meta"
@@ -98,6 +99,7 @@ func ImageStreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*
 	var content []ImageResponse2ChatContent
 	imgNum := 0
 	for scanner.Scan() {
+		adaptor.StartingStream(c, meta)
 		data := scanner.Text()
 		data = strings.TrimSpace(data)
 		if !strings.HasPrefix(data, "data: ") {
@@ -411,8 +413,7 @@ func responseGemini2OpenAIImage(response *ChatResponse, respType string) (*Image
 
 // 异步上传文件到gemini, 这里是针对chat模型做的优化, 可以加快聊天响应速度
 func syncUploadImg2Gemini(c *gin.Context, mimeType string, filePath string, url string) {
-	newContext := c.Copy()
-	go func() {
+	go func(newContext *gin.Context) {
 		_, fileData, err := FileHandler(newContext, url, url, mimeType, filePath)
 		if err != nil {
 			meta := meta.GetByContext(newContext)
@@ -420,5 +421,5 @@ func syncUploadImg2Gemini(c *gin.Context, mimeType string, filePath string, url 
 			return
 		}
 		logger.SysLogf("sync upload image to gemini success : %s", fileData)
-	}()
+	}(c.Copy())
 }

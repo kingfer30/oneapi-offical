@@ -50,10 +50,10 @@ func RelayTextHelper(c *gin.Context) *model.ErrorWithStatusCode {
 	if !meta.CalcPrompt {
 		promptTokens = 0
 	} else {
-		promptTokens = getPromptTokens(textRequest, meta.Mode)
+		promptTokens = billing.GetPromptTokens(textRequest, meta.Mode)
 	}
 	meta.PromptTokens = promptTokens
-	preConsumedQuota, bizErr := preConsumeQuota(ctx, textRequest, promptTokens, ratio, meta)
+	preConsumedQuota, bizErr := billing.PreConsumeQuota(ctx, textRequest, promptTokens, ratio, meta)
 	if bizErr != nil {
 		logger.Warnf(ctx, "preConsumeQuota failed: %+v", *bizErr)
 		return bizErr
@@ -99,7 +99,9 @@ func RelayTextHelper(c *gin.Context) *model.ErrorWithStatusCode {
 		return respErr
 	}
 	// post-consume quota
-	go postConsumeQuota(ctx, usage, meta, textRequest, ratio, preConsumedQuota, modelRatio, groupRatio, systemPromptReset)
+	go func(c *gin.Context) {
+		billing.PostConsumeQuota(c, usage, meta, textRequest, ratio, preConsumedQuota, modelRatio, groupRatio, systemPromptReset)
+	}(c.Copy())
 	return nil
 }
 

@@ -1,9 +1,10 @@
 package model
 
 import (
-	"context"
 	"fmt"
+	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
@@ -12,20 +13,23 @@ import (
 )
 
 type Log struct {
-	Id               int    `json:"id"`
-	UserId           int    `json:"user_id" gorm:"index"`
-	CreatedAt        int64  `json:"created_at" gorm:"bigint;index:idx_created_at_type"`
-	Type             int    `json:"type" gorm:"index:idx_created_at_type"`
-	Content          string `json:"content"`
-	Username         string `json:"username" gorm:"index:index_username_model_name,priority:2;default:''"`
-	TokenId          int    `json:"token_id" gorm:"index;"`
-	TokenName        string `json:"token_name" gorm:"index;default:''"`
-	ModelName        string `json:"model_name" gorm:"index;index:index_username_model_name,priority:1;default:''"`
-	Quota            int    `json:"quota" gorm:"default:0"`
-	PromptTokens     int    `json:"prompt_tokens" gorm:"default:0"`
-	CompletionTokens int    `json:"completion_tokens" gorm:"default:0"`
-	ChannelId        int    `json:"channel" gorm:"index"`
-	Ip               string `json:"ip"`
+	Id                int    `json:"id"`
+	UserId            int    `json:"user_id" gorm:"index"`
+	CreatedAt         int64  `json:"created_at" gorm:"bigint;index:idx_created_at_type"`
+	Type              int    `json:"type" gorm:"index:idx_created_at_type"`
+	Content           string `json:"content"`
+	Username          string `json:"username" gorm:"index:index_username_model_name,priority:2;default:''"`
+	TokenId           int    `json:"token_id" gorm:"index;"`
+	TokenName         string `json:"token_name" gorm:"index;default:''"`
+	ModelName         string `json:"model_name" gorm:"index;index:index_username_model_name,priority:1;default:''"`
+	Quota             int    `json:"quota" gorm:"default:0"`
+	PromptTokens      int    `json:"prompt_tokens" gorm:"default:0"`
+	CompletionTokens  int    `json:"completion_tokens" gorm:"default:0"`
+	ChannelId         int    `json:"channel" gorm:"index"`
+	Ip                string `json:"ip"`
+	UseTime           int    `json:"use_time" gorm:"default:0"`
+	IsStream          bool   `json:"is_stream" gorm:"default:false"`
+	FirstResponseTime int64  `json:"first_response_time" gorm:"default:0"`
 }
 
 const (
@@ -68,24 +72,29 @@ func RecordTopupLog(userId int, content string, quota int) {
 	}
 }
 
-func RecordConsumeLog(ctx context.Context, userId int, channelId int, promptTokens int, completionTokens int, modelName string, tokenName string, quota int64, content string, tokenId int) {
+func RecordConsumeLog(ctx *gin.Context, isStream bool, FirstResponseTime time.Time, useTimeSeconds int, userId int, channelId int, promptTokens int, completionTokens int, modelName string, tokenName string, quota int64, content string, tokenId int) {
 	logger.Info(ctx, fmt.Sprintf("record consume log: userId=%d, channelId=%d, promptTokens=%d, completionTokens=%d, modelName=%s, tokenName=%s, quota=%d, content=%s", userId, channelId, promptTokens, completionTokens, modelName, tokenName, quota, content))
 	if !config.LogConsumeEnabled {
 		return
 	}
+
 	log := &Log{
-		UserId:           userId,
-		Username:         GetUsernameById(userId),
-		CreatedAt:        helper.GetTimestamp(),
-		Type:             LogTypeConsume,
-		Content:          content,
-		PromptTokens:     promptTokens,
-		CompletionTokens: completionTokens,
-		TokenId:          tokenId,
-		TokenName:        tokenName,
-		ModelName:        modelName,
-		Quota:            int(quota),
-		ChannelId:        channelId,
+		UserId:            userId,
+		Username:          GetUsernameById(userId),
+		CreatedAt:         helper.GetTimestamp(),
+		Type:              LogTypeConsume,
+		Content:           content,
+		PromptTokens:      promptTokens,
+		CompletionTokens:  completionTokens,
+		TokenId:           tokenId,
+		TokenName:         tokenName,
+		ModelName:         modelName,
+		Quota:             int(quota),
+		ChannelId:         channelId,
+		UseTime:           useTimeSeconds,
+		FirstResponseTime: FirstResponseTime.Unix(),
+		IsStream:          isStream,
+		Ip:                ctx.ClientIP(),
 	}
 	err := LOG_DB.Create(log).Error
 	if err != nil {

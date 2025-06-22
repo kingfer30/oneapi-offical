@@ -3,7 +3,6 @@ package controller
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,6 +17,7 @@ import (
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/model"
+	"github.com/songquanpeng/one-api/relay/adaptor"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/billing"
 	billingratio "github.com/songquanpeng/one-api/relay/billing/ratio"
@@ -97,7 +97,7 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		}
 		if preConsumedQuota > 0 {
 			// we need to roll back the pre-consumed quota
-			defer func(ctx context.Context) {
+			defer func(ctx *gin.Context) {
 				go func() {
 					// negative means add quota back for token & user
 					err := model.PostConsumeTokenQuota(tokenId, -preConsumedQuota)
@@ -105,7 +105,7 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 						logger.Error(ctx, fmt.Sprintf("error rollback pre-consumed quota: %s", err.Error()))
 					}
 				}()
-			}(c.Request.Context())
+			}(c.Copy())
 		}
 	}()
 
@@ -196,11 +196,11 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		case "text":
 			text, err = getTextFromText(responseBody)
 		case "srt":
-			text, err = getTextFromSRT(responseBody)
+			text, err = getTextFromSRT(responseBody, c, meta)
 		case "verbose_json":
 			text, err = getTextFromVerboseJSON(responseBody)
 		case "vtt":
-			text, err = getTextFromVTT(responseBody)
+			text, err = getTextFromSRT(responseBody, c, meta)
 		default:
 			return openai.ErrorWrapper(errors.New("unexpected_response_format"), "unexpected_response_format", http.StatusInternalServerError)
 		}
@@ -215,9 +215,9 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	}
 	succeed = true
 	quotaDelta := quota - preConsumedQuota
-	defer func(ctx context.Context) {
-		go billing.PostConsumeQuota(ctx, tokenId, quotaDelta, quota, userId, channelId, modelRatio, groupRatio, audioModel, tokenName)
-	}(c.Request.Context())
+	defer func(ctx *gin.Context) {
+		go billing.PostAudioConsumeQuota(ctx, meta, tokenId, quotaDelta, quota, userId, channelId, modelRatio, groupRatio, audioModel, tokenName)
+	}(c.Copy())
 
 	for k, v := range resp.Header {
 		c.Writer.Header().Set(k, v[0])
@@ -235,10 +235,6 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	return nil
 }
 
-func getTextFromVTT(body []byte) (string, error) {
-	return getTextFromSRT(body)
-}
-
 func getTextFromVerboseJSON(body []byte) (string, error) {
 	var whisperResponse openai.WhisperVerboseJSONResponse
 	if err := json.Unmarshal(body, &whisperResponse); err != nil {
@@ -247,11 +243,12 @@ func getTextFromVerboseJSON(body []byte) (string, error) {
 	return whisperResponse.Text, nil
 }
 
-func getTextFromSRT(body []byte) (string, error) {
+func getTextFromSRT(body []byte, c *gin.Context, meta *meta.Meta) (string, error) {
 	scanner := bufio.NewScanner(strings.NewReader(string(body)))
 	var builder strings.Builder
 	var textLine bool
 	for scanner.Scan() {
+		adaptor.StartingStream(c, meta)
 		line := scanner.Text()
 		if textLine {
 			builder.WriteString(line)

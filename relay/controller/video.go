@@ -2,7 +2,6 @@ package controller
 
 import (
 	"bytes"
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -11,6 +10,7 @@ import (
 	"net/http"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common"
@@ -196,7 +196,8 @@ func RelayVideoHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 
 	prompt := 0
 	completion := 0
-	defer func(ctx context.Context) {
+	useTimeSeconds := time.Now().Unix() - meta.StartTime.Unix()
+	defer func(ctx *gin.Context) {
 		if resp != nil &&
 			resp.StatusCode != http.StatusCreated && // replicate returns 201
 			resp.StatusCode != http.StatusOK {
@@ -227,12 +228,12 @@ func RelayVideoHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		if quota != 0 {
 			tokenName := c.GetString(ctxkey.TokenName)
 			logContent := fmt.Sprintf("%s模型倍率 %.2f，分组倍率 %.2f", extendLog, modelRatio, groupRatio)
-			model.RecordConsumeLog(ctx, meta.UserId, meta.ChannelId, prompt, completion, videoRequest.Model, tokenName, quota, logContent, meta.TokenId)
+			model.RecordConsumeLog(c, meta.IsStream, meta.FirstResponseTime, int(useTimeSeconds), meta.UserId, meta.ChannelId, prompt, completion, videoRequest.Model, tokenName, quota, logContent, meta.TokenId)
 			model.UpdateUserUsedQuotaAndRequestCount(meta.UserId, quota)
 			channelId := c.GetInt(ctxkey.ChannelId)
 			model.UpdateChannelUsedQuota(channelId, quota)
 		}
-	}(c.Request.Context())
+	}(c)
 
 	return nil
 }

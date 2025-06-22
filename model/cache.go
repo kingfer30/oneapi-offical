@@ -222,6 +222,7 @@ func InitChannelCacheByMem() {
 	channelSyncLock.Lock()
 	group2model2channels = newGroup2model2channels
 	channelSyncLock.Unlock()
+	common.RedisDel("CHANNEL_GENERATE_LOCK")
 	logger.SysLog("channels synced from database")
 }
 

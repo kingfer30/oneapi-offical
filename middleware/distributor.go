@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common/ctxkey"
@@ -59,6 +60,7 @@ func Distribute() func(c *gin.Context) {
 
 func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, modelName string) {
 	c.Request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", channel.Key))
+	c.Set(ctxkey.RequestStartTime, time.Now())
 	c.Set(ctxkey.Channel, channel.Type)
 	c.Set(ctxkey.ChannelId, channel.Id)
 	c.Set(ctxkey.CalcPrompt, channel.CalcPrompt)
