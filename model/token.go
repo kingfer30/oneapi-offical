@@ -9,6 +9,7 @@ import (
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/billing"
 	"github.com/songquanpeng/one-api/common/config"
+	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/message"
@@ -90,6 +91,9 @@ func ValidateUserToken(c *gin.Context, key string) (token *Token, err error) {
 		logger.SysError("CacheGetTokenByKey failed: " + err.Error())
 		return nil, errors.New("failed to check key.")
 	}
+	//这里设置为了写日志
+	c.Set(ctxkey.TokenId, token.Id)
+	c.Set(ctxkey.TokenName, token.Name)
 	var keyText = helper.EncryptKey(token.Key)
 	if token.Status == TokenStatusExhausted {
 		return nil, helper.GetCustomReturnError(c, fmt.Sprintf("API Key: %s, You exceeded your current quota, please check your quota", keyText))
