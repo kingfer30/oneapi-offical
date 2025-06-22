@@ -98,8 +98,11 @@ func TokenAuth() func(c *gin.Context) {
 		key = strings.TrimPrefix(apiKey, "sk-")
 		parts := strings.Split(key, "-")
 		key = parts[0]
-		statusCode, resp, err := model.GetErrorCacheByKey(apiKey)
+		statusCode, resp, tokenId, tokenName, err := model.GetErrorCacheByKey(apiKey)
 		if err == nil {
+			//这里设置为了写日志
+			c.Set(ctxkey.TokenId, tokenId)
+			c.Set(ctxkey.TokenName, tokenName)
 			c.JSON(statusCode, resp)
 			c.Abort()
 			return

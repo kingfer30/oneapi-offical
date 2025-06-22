@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
+	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/service"
@@ -28,6 +29,8 @@ func abortWithMessage(c *gin.Context, statusCode int, message string, needCache 
 			info := make(map[string]interface{})
 			info["statusCode"] = statusCode
 			info["response"] = res
+			info[ctxkey.TokenId] = c.GetInt(ctxkey.TokenId)
+			info[ctxkey.TokenName] = c.GetString(ctxkey.TokenName)
 			jsonBytes, err := json.Marshal(info)
 			if err == nil {
 				common.RedisSetNx(fmt.Sprintf("Auth_Error:%s", apiKey), string(jsonBytes), time.Duration(config.ErrorCacheTimeout)*time.Second)

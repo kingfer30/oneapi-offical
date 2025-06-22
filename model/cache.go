@@ -14,6 +14,7 @@ import (
 
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
+	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/random"
@@ -188,7 +189,9 @@ func InitChannelCacheByMem() {
 	}
 	for _, channel := range channels {
 		channel.SleepModels = make(map[string]int64)
-		config.ChannelBaseUrlList[channel.Id] = *channel.BaseURL
+		if *channel.BaseURL != "" {
+			config.ChannelBaseUrlList[channel.Id] = *channel.BaseURL
+		}
 	}
 	var abilities []*Ability
 	DB.Find(&abilities)
@@ -348,27 +351,29 @@ func WakeupChannel(frequency int) {
 }
 
 // 获取错误的缓存key
-func GetErrorCacheByKey(key string) (int, map[string]any, error) {
+func GetErrorCacheByKey(key string) (int, map[string]any, int, string, error) {
 	if errString, serr := common.RedisGet(fmt.Sprintf("Auth_Error:%s", key)); serr == nil || errString != "" {
 		var info map[string]any
 		err := json.Unmarshal([]byte(errString), &info)
 		if err != nil {
-			return 0, nil, err
+			return 0, nil, 0, "", err
 		}
 		statusCode, ok := info["statusCode"].(float64)
 		if !ok {
-			return 0, nil, fmt.Errorf("no statusCode")
+			return 0, nil, 0, "", fmt.Errorf("no statusCode")
 		}
 		response, ok := info["response"].(map[string]interface{})
 		if !ok {
-			return 0, nil, fmt.Errorf("no response")
+			return 0, nil, 0, "", fmt.Errorf("no response")
 		}
+		tokenId, ok := info[ctxkey.TokenId].(float64)
+		tokenName, ok := info[ctxkey.TokenName].(string)
 		if statusCode <= 0 || response == nil {
-			return 0, nil, fmt.Errorf("empty")
+			return 0, nil, 0, "", fmt.Errorf("empty response")
 		}
-		return int(statusCode), response, nil
+		return int(statusCode), response, int(tokenId), tokenName, nil
 	}
-	return 0, nil, fmt.Errorf("no key exists")
+	return 0, nil, 0, "", fmt.Errorf("no key exists")
 }
 
 // 异步停止渠道软限制
