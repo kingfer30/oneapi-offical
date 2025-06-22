@@ -170,7 +170,7 @@ var testAllChannelsRunning bool = false
 
 func testChannels(notify bool, scope string) error {
 	if config.RootUserEmail == "" {
-		config.RootUserEmail = model.GetRootUserEmail()
+		return errors.New("failed to send email: RootUserEmail is empty")
 	}
 	testAllChannelsLock.Lock()
 	if testAllChannelsRunning {
@@ -203,7 +203,7 @@ func testChannels(notify bool, scope string) error {
 					_ = message.Notify(message.ByAll, fmt.Sprintf("渠道 %s （%d）测试超时", channel.Name, channel.Id), "", err.Error())
 				}
 			}
-			if isChannelEnabled && monitor.ShouldDisableChannel(openaiErr, -1) {
+			if isChannelEnabled && monitor.ShouldDisableChannel(openaiErr, -1, channel.Id, channel.Type) {
 				monitor.DisableChannel(channel.Id, channel.Name, err.Error())
 			}
 			if !isChannelEnabled && monitor.ShouldEnableChannel(err, openaiErr) {

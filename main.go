@@ -69,6 +69,7 @@ func main() {
 	logger.SysLog(fmt.Sprintf("using theme %s", config.Theme))
 	if common.RedisEnabled {
 		config.MemoryCacheEnabled = true
+		config.RootUserEmail = model.GetRootUserEmail()
 	}
 	if config.MemoryCacheEnabled {
 		logger.SysLog("memory cache enabled")

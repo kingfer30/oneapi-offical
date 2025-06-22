@@ -6,9 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
-	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/logger"
@@ -366,25 +364,13 @@ func UpdateChannelsAbilities() (any, error) {
 
 // disable & notify
 func DisableChannel(channelId int, status int, channelName string, reason string) {
-	if config.RootUserEmail == "" {
-		config.RootUserEmail = GetRootUserEmail()
-	}
 	UpdateChannelStatusById(channelId, status)
 
 	//通知与缓存更新改为异步, 防止卡死
 	go func() {
 		subject := fmt.Sprintf("通道「%s」(#%d)已被禁用", channelName, channelId)
 		content := fmt.Sprintf("通道「%s」(#%d)已被禁用，原因: %s", channelName, channelId, reason)
-		//邮件只通知一次, 防止发送多封一样的
-		if count, serr := common.RedisExists(fmt.Sprintf("send_mail:%s", subject)); serr != nil || count == 0 {
-			ok, err := common.RedisSetNx(fmt.Sprintf("send_mail:%s", subject), "1", time.Duration(60*time.Second))
-			if ok || err == nil {
-				err := message.SendEmail(subject, config.RootUserEmail, content)
-				if err != nil {
-					logger.SysErrorf("failed to send email: %s", err.Error())
-				}
-			}
-		}
+		message.SendMailToAdmin(subject, content)
 
 		//重新初始化更新渠道信息
 		InitChannelCache()

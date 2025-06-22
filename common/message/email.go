@@ -13,6 +13,7 @@ import (
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/logger"
+	"github.com/songquanpeng/one-api/common/random"
 )
 
 func shouldAuth() bool {
@@ -114,13 +115,41 @@ func SendEmail(subject string, receiver string, content string) error {
 func SendMailASync(email string, subject string, content string) {
 	go func() {
 		if email != "" {
-			if count, serr := common.RedisExists(fmt.Sprintf("send_mail:%s", subject)); serr != nil || count == 0 {
-				ok, err := common.RedisSetNx(fmt.Sprintf("send_mail:%s", subject), "1", time.Duration(60*time.Second))
+			if count, serr := common.RedisExists(fmt.Sprintf("send_mail:%s", random.StrToMd5(subject))); serr != nil || count == 0 {
+				ok, err := common.RedisSetNx(fmt.Sprintf("send_mail:%s", random.StrToMd5(subject)), "1", time.Duration(60*time.Second))
 				if ok || err == nil {
 					err := SendEmail(subject, email, content)
 					if err != nil {
 						logger.SysErrorf("failed to send email: %s", err.Error())
 					}
+				}
+			}
+		}
+	}()
+}
+
+// 发送邮件给管理员
+// 异步不阻塞发送邮件, 增加锁避免发送重复
+func SendMailToAdmin(subject string, content string) {
+	go func() {
+		if count, serr := common.RedisExists(fmt.Sprintf("send_mail:%s", random.StrToMd5(subject))); serr != nil || count == 0 {
+			ok, err := common.RedisSetNx(fmt.Sprintf("send_mail:%s", random.StrToMd5(subject)), "1", time.Duration(60*time.Second))
+			if ok || err == nil {
+				if config.MessagePusherAddress != "" {
+					err := SendMessage(subject, content, content)
+					if err != nil {
+						logger.SysError(fmt.Sprintf("failed to send message: %s", err.Error()))
+					} else {
+						return
+					}
+				}
+				if config.RootUserEmail == "" {
+					logger.SysError("failed to send email: RootUserEmail is empty")
+					return
+				}
+				err := SendEmail(subject, config.RootUserEmail, content)
+				if err != nil {
+					logger.SysError(fmt.Sprintf("failed to send email: %s", err.Error()))
 				}
 			}
 		}

@@ -160,7 +160,7 @@ func processChannelRelayError(c *gin.Context, userId int, channelId int, channel
 		}
 	}
 	// https://platform.openai.com/docs/guides/error-codes/api-errors
-	if monitor.ShouldDisableChannel(&err.Error, err.StatusCode) {
+	if monitor.ShouldDisableChannel(&err.Error, err.StatusCode, channelId, channelType) {
 		monitor.DisableChannel(channelId, channelName, err.Message)
 	} else {
 		monitor.Emit(channelId, false)

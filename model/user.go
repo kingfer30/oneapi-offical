@@ -1,9 +1,11 @@
 package model
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/blacklist"
@@ -402,8 +404,22 @@ func decreaseUserQuota(id int, quota int64) (err error) {
 }
 
 func GetRootUserEmail() (email string) {
-	DB.Model(&User{}).Where("role = ?", RoleRootUser).Select("email").Find(&email)
-	return email
+	var user User
+	userStr, err := common.RedisGet("admin_info")
+	if err == nil && userStr != "" {
+		//找到缓存信息优先返回
+		err = json.Unmarshal([]byte(userStr), &user)
+		if err == nil {
+			return user.Email
+		}
+	}
+	//找不到再查数据库
+	DB.Model(&user).Where("role = ?", RoleRootUser).Find(&user)
+	jsonBytes, err := json.Marshal(user)
+	if err == nil {
+		common.RedisSetNx("admin_info", string(jsonBytes), time.Duration(config.SyncFrequency)*time.Second)
+	}
+	return user.Email
 }
 
 func UpdateUserUsedQuotaAndRequestCount(id int, quota int64) {

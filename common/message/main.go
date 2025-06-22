@@ -2,6 +2,7 @@ package message
 
 import (
 	"fmt"
+
 	"github.com/songquanpeng/one-api/common/config"
 )
 
@@ -12,6 +13,13 @@ const (
 )
 
 func Notify(by string, title string, description string, content string) error {
+	if by == ByAll {
+		err := SendEmail(title, config.RootUserEmail, content)
+		if err != nil {
+			return err
+		}
+		return SendMessage(title, description, content)
+	}
 	if by == ByEmail {
 		return SendEmail(title, config.RootUserEmail, content)
 	}
