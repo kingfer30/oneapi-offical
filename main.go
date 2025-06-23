@@ -14,7 +14,6 @@ import (
 	"github.com/songquanpeng/one-api/common/client"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/logger"
-	"github.com/songquanpeng/one-api/controller"
 	"github.com/songquanpeng/one-api/middleware"
 	"github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/monitor"
@@ -84,14 +83,6 @@ func main() {
 		}
 		go model.SyncChannelCache(frequency)
 	}
-	if os.Getenv("SYNC_OPTIONS_FREQUENCY") != "" {
-		//配置缓存
-		frequency, err := strconv.Atoi(os.Getenv("SYNC_OPTIONS_FREQUENCY"))
-		if err != nil {
-			logger.FatalLog("failed to parse SYNC_OPTIONS_FREQUENCY: " + err.Error())
-		}
-		go model.SyncOptions(frequency)
-	}
 	//渠道唤醒
 	if os.Getenv("SYNC_CHANNEL_WAKEUP") != "" {
 		frequency, err := strconv.Atoi(os.Getenv("SYNC_CHANNEL_WAKEUP"))
@@ -116,12 +107,21 @@ func main() {
 		}
 		go model.SyncTokenAlert(frequency)
 	}
-	if os.Getenv("CHANNEL_TEST_FREQUENCY") != "" {
-		frequency, err := strconv.Atoi(os.Getenv("CHANNEL_TEST_FREQUENCY"))
+	if os.Getenv("SYNC_OPTIONS_FREQUENCY") != "" {
+		//配置缓存
+		frequency, err := strconv.Atoi(os.Getenv("SYNC_OPTIONS_FREQUENCY"))
 		if err != nil {
-			logger.FatalLog("failed to parse CHANNEL_TEST_FREQUENCY: " + err.Error())
+			logger.FatalLog("failed to parse SYNC_OPTIONS_FREQUENCY: " + err.Error())
 		}
-		go controller.AutomaticallyTestChannels(frequency)
+		go model.SyncOptions(frequency)
+	}
+	if os.Getenv("TOKEN_UPDATE_FREQUENCY") != "" {
+		//更新token
+		frequency, err := strconv.Atoi(os.Getenv("TOKEN_UPDATE_FREQUENCY"))
+		if err != nil {
+			logger.FatalLog("failed to parse TOKEN_UPDATE_FREQUENCY: " + err.Error())
+		}
+		go model.UpdateAllTokensStatus(frequency)
 	}
 	if os.Getenv("BATCH_UPDATE_ENABLED") == "true" {
 		config.BatchUpdateEnabled = true
