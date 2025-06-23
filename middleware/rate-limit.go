@@ -23,7 +23,7 @@ func redisRateLimiter(c *gin.Context, maxRequestNum int, duration int64, mark st
 		ctx := context.Background()
 		rdb := common.RDB
 		apiKey := c.GetString("api_key")
-		modelName := c.GetString("model_name")
+		modelName := c.GetString("request_model")
 		ip := c.ClientIP()
 		var key string
 		if apiKey != "" {
