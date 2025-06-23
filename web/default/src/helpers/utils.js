@@ -134,7 +134,7 @@ export function removeTrailingSlash(url) {
   }
 }
 
-export function timestamp2string(timestamp) {
+export function timestamp2string(timestamp, onlyDate = false) {
   let date = new Date(timestamp * 1000);
   let year = date.getFullYear().toString();
   let month = (date.getMonth() + 1).toString();
@@ -163,12 +163,13 @@ export function timestamp2string(timestamp) {
     month +
     '-' +
     day +
-    ' ' +
-    hour +
-    ':' +
-    minute +
-    ':' +
-    second
+    (onlyDate ? "" : (' ' +
+      hour +
+      ':' +
+      minute +
+      ':' +
+      second)
+    )
   );
 }
 
