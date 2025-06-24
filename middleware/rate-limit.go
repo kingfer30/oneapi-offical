@@ -20,6 +20,12 @@ var inMemoryRateLimiter common.InMemoryRateLimiter
 
 func redisRateLimiter(c *gin.Context, maxRequestNum int, duration int64, mark string) {
 	if !strings.HasPrefix(c.Request.URL.RawQuery, "retry=") {
+		rpm := c.GetInt("token_rpm")
+		if rpm == 0 {
+			c.Next()
+			return
+		}
+		maxRequestNum = rpm
 		ctx := context.Background()
 		rdb := common.RDB
 		apiKey := c.GetString("api_key")
@@ -29,9 +35,6 @@ func redisRateLimiter(c *gin.Context, maxRequestNum int, duration int64, mark st
 		if apiKey != "" {
 			apiKey = strings.TrimPrefix(apiKey, "sk-")
 			key = "rateLimit:" + mark + "_" + apiKey + "_" + modelName
-			if c.GetInt("token_rpm") != 0 {
-				maxRequestNum = c.GetInt("token_rpm")
-			}
 		} else {
 			key = "rateLimit:" + mark + "_" + ip
 		}
