@@ -237,6 +237,12 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	imageRequest.Model, _ = getMappedModelName(imageRequest.Model, billingratio.ImageOriginModelName)
 	c.Set("response_format", imageRequest.ResponseFormat)
 
+	adaptor := relay.GetAdaptor(meta.APIType)
+	if adaptor == nil {
+		return openai.ErrorWrapper(fmt.Errorf("invalid api type: %d", meta.APIType), "invalid_api_type", http.StatusBadRequest)
+	}
+	adaptor.Init(meta)
+
 	var requestBody io.Reader
 	var jsonStr []byte
 	if isModelMapped || meta.ChannelType == channeltype.Azure { // make Azure channel request body
@@ -246,14 +252,10 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		}
 		requestBody = bytes.NewBuffer(jsonStr)
 	} else {
-		requestBody = c.Request.Body
+		bodyByte, _ := common.GetRequestBody(c)
+		jsonStr = bodyByte
+		requestBody = bytes.NewBuffer(bodyByte)
 	}
-
-	adaptor := relay.GetAdaptor(meta.APIType)
-	if adaptor == nil {
-		return openai.ErrorWrapper(fmt.Errorf("invalid api type: %d", meta.APIType), "invalid_api_type", http.StatusBadRequest)
-	}
-	adaptor.Init(meta)
 
 	// these adaptors need to convert the request
 	switch meta.ChannelType {
@@ -272,13 +274,6 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		}
 		requestBody = bytes.NewBuffer(jsonStr)
 	}
-	if len(jsonStr) == 0 {
-		jsonStr, err = json.Marshal(requestBody)
-		if err != nil {
-			return openai.ErrorWrapper(err, "marshal_image_request_failed", http.StatusInternalServerError)
-		}
-	}
-
 	logger.Debugf(c.Request.Context(), "converted request: \n%s", string(jsonStr))
 
 	modelRatio := billingratio.GetModelRatio(imageModel, meta.ChannelType, meta.Group)
@@ -334,7 +329,6 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 			if imageRequest.Model == "gpt-image-1" {
 				prompt = usage.InputTokens
 				completion = usage.OutputTokens
-				logger.SysLogf("prompt:%v, completion:%v", prompt, completion)
 				quota = int64(prompt) + int64(float64(completion)*completionRatio)
 				quota = int64(float64(quota) * modelRatio)
 			}

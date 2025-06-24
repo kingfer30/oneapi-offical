@@ -59,6 +59,9 @@ func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
 
 func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Request, meta *meta.Meta) error {
 	channelhelper.SetupCommonRequestHeader(c, req, meta)
+	if strings.HasPrefix(c.Request.Header.Get("Content-Type"), "multipart/form-data") {
+		c.Request.Header.Set("Content-Type", "application/json")
+	}
 	key := c.GetString("x-new-api-key")
 	if key != "" {
 		logger.SysLogf("x-new-api-key: %s | old: %s ", key, meta.APIKey)

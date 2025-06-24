@@ -39,7 +39,7 @@ func UnmarshalBodyReusable(c *gin.Context, v any) error {
 	if strings.HasPrefix(contentType, "application/json") {
 		err = json.Unmarshal(requestBody, &v)
 	} else if strings.HasPrefix(contentType, "multipart/form-data") {
-		//这里需要重新绑定, 因为它读的request的
+		//这里需要重新绑定, 因为它读的c.Request的, 而c.Request需要在下面才会
 		c.Request.Body = io.NopCloser(bytes.NewBuffer(requestBody))
 		err = BindMultipartForm(c.Request, v)
 	} else {

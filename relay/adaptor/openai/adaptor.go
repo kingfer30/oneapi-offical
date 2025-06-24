@@ -110,6 +110,8 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 	} else {
 		switch meta.Mode {
 		case relaymode.ImagesGenerations:
+			fallthrough
+		case relaymode.ImagesEdit:
 			err, usage = ImageHandler(c, resp)
 		default:
 			err, usage = Handler(c, resp, meta.PromptTokens, meta.ActualModelName)
