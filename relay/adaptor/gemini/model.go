@@ -38,8 +38,13 @@ type Error struct {
 }
 
 type ErrorDetail struct {
-	Type       string `json:"@type,omitempty"`
-	RetryDelay string `json:"retryDelay,omitempty"`
+	Type            string            `json:"@type,omitempty"`
+	RetryDelay      string            `json:"retryDelay,omitempty"`
+	ErrorViolations []ErrorViolations `json:"violations,omitempty"`
+}
+type ErrorViolations struct {
+	QuotaId    string `json:"quotaId,omitempty"`
+	QuotaValue string `json:"quotaValue,omitempty"`
 }
 
 type GeminiErrorResponse struct {
