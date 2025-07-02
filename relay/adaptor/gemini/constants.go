@@ -32,6 +32,7 @@ var ModelList = []string{
 	"gemini-2.0-flash-lite",
 	"gemini-2.0-flash-lite-001",
 	"gemini-2.0-flash-lite-preview-02-05",
+	"gemini-2.0-flash-lite-preview-06-17",
 	"gemini-2.0-flash-lite-preview",
 	"gemini-2.0-pro-exp-02-05",
 	"gemini-2.0-pro-exp",
@@ -46,11 +47,15 @@ var ModelList = []string{
 	"gemini-2.5-flash-preview-04-17-thinking",
 	"gemini-2.5-flash-preview-05-20",
 	"gemini-2.5-flash-preview-tts",
+	"gemini-2.5-flash",
 	"gemini-2.5-pro-preview-tts",
 	"gemini-2.5-pro-preview-03-25",
 	"gemini-2.5-pro-preview-05-06",
 	"gemini-2.5-pro-preview-06-05",
+	"gemini-2.5-pro",
 	"imagen-3.0-generate-002",
+	"imagen-4.0-generate-preview-06-06",
+	"imagen-4.0-ultra-generate-preview-06-06",
 	"veo-2.0-generate-001",
 }
 

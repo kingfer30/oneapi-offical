@@ -241,6 +241,60 @@ const EditChannel = () => {
     handleInputChange(null, { name: 'models', value: localModels });
   };
 
+  const putCommonModel = () => {
+    var newArr =[]
+    switch (inputs.type) {
+      case 1:
+        //OpenAI
+        newArr=basicModels.filter(function (v, i) {
+          return v.startsWith("gpt-3") || v.startsWith("dall-e-2") || v.startsWith("tts-") || v.startsWith("whisper-") || 
+          v.includes("davinci") || v.includes("babbage") || v.startsWith("text-")
+        })
+        break;
+      case 14:
+        //Claude
+        newArr=basicModels.filter(function (v, i) {
+          return v.startsWith("claude-3") 
+        })
+        break;
+      case 24:
+        //Gemini
+        newArr=basicModels.filter(function (v, i) {
+          return v.startsWith("gemini-1.5-flash") || v.startsWith("gemini-2.0-flash") || v.startsWith("gemini-2.5-flash") || v.includes("embedding")
+        })
+        break;
+      default:
+        break;
+    }
+    handleInputChange(null, { name: 'models', value: newArr });
+  }
+    const putHigherModel = () => {
+    var newArr =[]
+    switch (inputs.type) {
+      case 1:
+        //OpenAI
+        newArr=basicModels.filter(function (v, i) {
+          return v.startsWith("gpt-4") || v.startsWith("dall-e-3") || v.startsWith("gpt-4") || v.startsWith("o1") || v.startsWith("o3") || v.startsWith("o4") || v.startsWith("gpt-image")
+        })
+        break;
+      case 14:
+        //Claude
+        newArr=basicModels.filter(function (v, i) {
+          return v.includes("-4")
+        })
+        break;
+      case 24:
+        //Gemini
+        newArr=basicModels.filter(function (v, i) {
+          return v.startsWith("gemini-1.0-pro") || v.startsWith("gemini-1.5-pro") || v.startsWith("gemini-2.0-pro") || v.startsWith("gemini-2.5-pro") || 
+          v.startsWith("imagen-") || v.startsWith("veo-")
+        })
+        break;
+      default:
+        break;
+    }
+    handleInputChange(null, { name: 'models', value: newArr });
+  }
   return (
     <>
       <Segment loading={loading}>
@@ -418,6 +472,8 @@ const EditChannel = () => {
                 <Button type={'button'} onClick={() => {
                   handleInputChange(null, { name: 'models', value: fullModels });
                 }}>填入所有模型</Button>
+                <Button type={'button'} onClick={putCommonModel}>填入低级模型</Button>
+                <Button type={'button'} onClick={putHigherModel}>填入高级模型</Button>
                 <Button type={'button'} onClick={() => {
                   handleInputChange(null, { name: 'models', value: [] });
                 }}>清除所有模型</Button>
