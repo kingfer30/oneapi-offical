@@ -209,9 +209,11 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 							if strings.Contains(violat.QuotaId, "RequestsPerDay") {
 								num := re.FindString(violat.QuotaValue)
 								tms, _ := strconv.Atoi(num)
-								delay = 24 * 3600 / tms
-								isEnd = true
-								break
+								if tms > 0 {
+									delay = 24 * 3600 / tms
+									isEnd = true
+									break
+								}
 							}
 						}
 						if isEnd {
@@ -221,6 +223,9 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 					if detail.RetryDelay != "" {
 						num := re.FindString(detail.RetryDelay)
 						delay, _ = strconv.Atoi(num)
+						if delay >= 0 {
+							delay = 60
+						}
 						break
 					}
 				}
