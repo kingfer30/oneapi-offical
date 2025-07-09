@@ -199,6 +199,14 @@ func getImageCostRatio(imageRequest *relaymodel.ImageRequest) (float64, string, 
 			} else {
 				imageCostRatio = 2
 			}
+		} else {
+			if imageRequest.Size == "1024x1024" {
+				imageCostRatio = 1
+			} else if imageRequest.Size == "1024x1792" || imageRequest.Size == "1792x1024" {
+				imageCostRatio = 2
+			} else {
+				imageCostRatio = 1
+			}
 		}
 	} else {
 		imageCostRatio *= getImageSizeRatio(imageRequest.Model, imageRequest.Size)
