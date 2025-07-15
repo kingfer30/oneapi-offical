@@ -150,7 +150,7 @@ func responseAli2OpenAI(response *ChatResponse) *openai.TextResponse {
 	return &fullTextResponse
 }
 
-func streamResponseAli2OpenAI(aliResponse *ChatResponse) *openai.ChatCompletionsStreamResponse {
+func streamResponseAli2OpenAI(aliResponse *ChatResponse, modelName string) *openai.ChatCompletionsStreamResponse {
 	if len(aliResponse.Output.Choices) == 0 {
 		return nil
 	}
@@ -165,7 +165,7 @@ func streamResponseAli2OpenAI(aliResponse *ChatResponse) *openai.ChatCompletions
 		Id:      aliResponse.RequestId,
 		Object:  "chat.completion.chunk",
 		Created: helper.GetTimestamp(),
-		Model:   "qwen",
+		Model:   modelName,
 		Choices: []openai.ChatCompletionsStreamResponseChoice{choice},
 	}
 	return &response
@@ -208,10 +208,11 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model
 			usage.CompletionTokens = aliResponse.Usage.OutputTokens
 			usage.TotalTokens = aliResponse.Usage.InputTokens + aliResponse.Usage.OutputTokens
 		}
-		response := streamResponseAli2OpenAI(&aliResponse)
+		response := streamResponseAli2OpenAI(&aliResponse, meta.ActualModelName)
 		if response == nil {
 			continue
 		}
+		response.Usage = &usage
 		err = render.ObjectData(c, response)
 		if err != nil {
 			logger.SysError(err.Error())
