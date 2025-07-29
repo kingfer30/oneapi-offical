@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/render"
 
 	"github.com/gin-gonic/gin"
@@ -38,6 +39,10 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model
 	for scanner.Scan() {
 		adaptor.StartingStream(c, meta)
 		data := scanner.Text()
+
+		if config.DebugEnabled {
+			logger.SysLogf("Body: %s", data)
+		}
 		if len(data) < dataPrefixLength { // ignore blank line or wrong format
 			continue
 		}
@@ -58,7 +63,7 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model
 				render.StringData(c, data) // if error happened, pass the data to client
 				continue                   // just ignore the error
 			}
-			if len(streamResponse.Choices) == 0 && streamResponse.Usage == nil {
+			if len(streamResponse.Choices) == 0 {
 				// but for empty choice and no usage, we should not pass it to client, this is for azure
 				continue // just ignore empty choice
 			}
@@ -66,7 +71,7 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model
 			for _, choice := range streamResponse.Choices {
 				responseText += conv.AsString(choice.Delta.Content)
 			}
-			if streamResponse.Usage != nil {
+			if streamResponse.Usage != nil && streamResponse.Usage.TotalTokens > 0 {
 				usage = streamResponse.Usage
 			}
 		case relaymode.Completions:

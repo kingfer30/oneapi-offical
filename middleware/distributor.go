@@ -63,7 +63,7 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 	c.Set(ctxkey.RequestStartTime, time.Now())
 	c.Set(ctxkey.Channel, channel.Type)
 	c.Set(ctxkey.ChannelId, channel.Id)
-	c.Set(ctxkey.CalcPrompt, channel.CalcPrompt)
+	c.Set(ctxkey.CalcPrompt, *channel.CalcPrompt)
 	c.Set(ctxkey.ChannelName, channel.Name)
 	if channel.SystemPrompt != nil && *channel.SystemPrompt != "" {
 		c.Set(ctxkey.SystemPrompt, *channel.SystemPrompt)
