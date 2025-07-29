@@ -45,7 +45,7 @@ func ShouldDisableChannel(err *model.Error, statusCode int, channelId int, chann
 		strings.Contains(lowerMessage, "organization has been restricted") || // groq
 		strings.Contains(lowerMessage, "已欠费") ||
 		strings.Contains(lowerMessage, "quota exceeded for quota metric 'generate content api requests per minute'") || // gemini
-		strings.Contains(lowerMessage, "API Key not found. Please pass a valid API key") || // gemini
+		strings.Contains(lowerMessage, "api key not found. please pass a valid api key") || // gemini
 		strings.Contains(lowerMessage, "permission denied: consumer 'api_key:ai") {
 
 		if channelType == channeltype.Custom {
