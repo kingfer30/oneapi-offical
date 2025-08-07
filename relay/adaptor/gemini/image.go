@@ -24,7 +24,7 @@ import (
 	relaymodel "github.com/songquanpeng/one-api/relay/model"
 )
 
-func ConvertImageRequest(request relaymodel.ImageRequest) (*ImageRequest, error) {
+func ConvertImageRequest(c *gin.Context, request relaymodel.ImageRequest) (*ImageRequest, error) {
 	var contents []ChatContent
 	if len(request.Image) > 0 {
 		logger.SysLogf("有图片! %d 张", len(request.Image))
@@ -32,9 +32,18 @@ func ConvertImageRequest(request relaymodel.ImageRequest) (*ImageRequest, error)
 		for _, img := range request.Image {
 			//图片编辑
 			mimeType, fileData, err := image.GetImageFromUrl(img, false)
+			// mimeType, fileName, err := image.GetImageFromUrl(img, true)
+			// mimeType, fileData, err := FileHandler(c, img, img, mimeType, fileName)
+
 			if err != nil {
 				return nil, err
 			}
+			// parts = append(parts, Part{
+			// 	FileData: &FileData{
+			// 		MimeType: mimeType,
+			// 		Uri:      fileData,
+			// 	},
+			// })
 			parts = append(parts, Part{
 				InlineData: &InlineData{
 					MimeType: mimeType,
@@ -81,7 +90,7 @@ func ConvertImageRequest(request relaymodel.ImageRequest) (*ImageRequest, error)
 	imageRequest := ImageRequest{
 		Contents: contents,
 		GenerationConfig: ChatGenerationConfig{
-			ResponseModalities: []string{"text", "image"},
+			ResponseModalities: []string{"Text", "Image"},
 		},
 	}
 
@@ -240,6 +249,9 @@ func ImageHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model.
 	err = resp.Body.Close()
 	if err != nil {
 		return openai.ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), nil
+	}
+	if config.DebugEnabled {
+		logger.SysLogf("responseBody: %s", string(responseBody))
 	}
 	err = json.Unmarshal(responseBody, &geminiResponse)
 	if err != nil {

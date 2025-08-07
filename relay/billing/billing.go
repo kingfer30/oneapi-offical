@@ -87,7 +87,7 @@ func PostConsumeQuota(ctx *gin.Context, usage *relaymodel.Usage, meta *meta.Meta
 	}
 	useTimeSeconds := time.Now().Unix() - meta.StartTime.Unix()
 	var quota int64
-	modelName := textRequest.Model
+	modelName := meta.OriginModelName
 	if meta.UseThinking {
 		modelName = modelName + "-thinking"
 	}
@@ -124,7 +124,7 @@ func PostConsumeQuota(ctx *gin.Context, usage *relaymodel.Usage, meta *meta.Meta
 		extraLog = " （注意系统提示词已被重置）"
 	}
 	logContent := fmt.Sprintf("模型倍率 %.2f，分组倍率 %.2f，补全倍率 %.2f%s", modelRatio, groupRatio, completionRatio, extraLog)
-	model.RecordConsumeLog(ctx, meta.IsStream, meta.FirstResponseTime, int(useTimeSeconds), meta.UserId, meta.ChannelId, promptTokens, completionTokens, textRequest.Model, meta.TokenName, quota, logContent, meta.TokenId)
+	model.RecordConsumeLog(ctx, meta.IsStream, meta.FirstResponseTime, int(useTimeSeconds), meta.UserId, meta.ChannelId, promptTokens, completionTokens, meta.OriginModelName, meta.TokenName, quota, logContent, meta.TokenId)
 	model.UpdateUserUsedQuotaAndRequestCount(meta.UserId, quota)
 	model.UpdateChannelUsedQuota(meta.ChannelId, quota)
 }

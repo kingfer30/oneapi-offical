@@ -14,6 +14,7 @@ import (
 	"github.com/songquanpeng/one-api/relay/adaptor/gemini"
 	"github.com/songquanpeng/one-api/relay/adaptor/ollama"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
+	"github.com/songquanpeng/one-api/relay/adaptor/openrouter"
 	"github.com/songquanpeng/one-api/relay/adaptor/palm"
 	"github.com/songquanpeng/one-api/relay/adaptor/proxy"
 	"github.com/songquanpeng/one-api/relay/adaptor/replicate"
@@ -64,6 +65,8 @@ func GetAdaptor(apiType int) adaptor.Adaptor {
 		return &proxy.Adaptor{}
 	case apitype.Replicate:
 		return &replicate.Adaptor{}
+	case apitype.OpenRouter:
+		return &openrouter.Adaptor{}
 	}
 	return nil
 }

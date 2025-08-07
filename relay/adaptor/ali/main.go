@@ -70,7 +70,7 @@ func ConvertEmbeddingRequest(request model.GeneralOpenAIRequest) *EmbeddingReque
 	}
 }
 
-func ConvertImageRequest(request model.ImageRequest) *ImageRequest {
+func ConvertImageRequest(c *gin.Context, request model.ImageRequest) *ImageRequest {
 	var imageRequest ImageRequest
 	imageRequest.Input.Prompt = request.Prompt
 	imageRequest.Model = request.Model

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/songquanpeng/one-api/common/config"
@@ -67,6 +68,9 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model
 				// but for empty choice and no usage, we should not pass it to client, this is for azure
 				continue // just ignore empty choice
 			}
+			//将模型名称改为用户输入
+			re := regexp.MustCompile(`"model":"(.*?)"`)
+			data = re.ReplaceAllString(data, `"model":"`+meta.OriginModelName+`"`)
 			render.StringData(c, data)
 			for _, choice := range streamResponse.Choices {
 				responseText += conv.AsString(choice.Delta.Content)
@@ -129,8 +133,11 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 			StatusCode: resp.StatusCode,
 		}, nil
 	}
+	//将模型名称改为用户输入
+	re := regexp.MustCompile(`"model":"(.*?)"`)
+	bodyStr := re.ReplaceAllString(string(responseBody), `"model":"`+modelName+`"`)
 	// Reset response body
-	resp.Body = io.NopCloser(bytes.NewBuffer(responseBody))
+	resp.Body = io.NopCloser(bytes.NewBuffer([]byte(bodyStr)))
 
 	// We shouldn't set the header before we parse the response body, because the parse part may fail.
 	// And then we will have to send an error response, but in this case, the header has already been set.

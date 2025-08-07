@@ -446,7 +446,7 @@ func streamResponseGeminiChat2OpenAI(geminiResponse *ChatResponse, meta *meta.Me
 	response.Id = fmt.Sprintf("chatcmpl-%s", random.GetUUID())
 	response.Created = helper.GetTimestamp()
 	response.Object = "chat.completion.chunk"
-	response.Model = meta.ActualModelName
+	response.Model = meta.OriginModelName
 	response.Choices = []openai.ChatCompletionsStreamResponseChoice{choice}
 	return &response
 }
@@ -467,12 +467,13 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relay
 		if !strings.HasPrefix(data, "data: ") {
 			continue
 		}
-		data = strings.TrimPrefix(data, "data: ")
-		data = strings.TrimSuffix(data, "\"")
-
 		if config.DebugEnabled {
 			logger.SysLogf("Body: %s", data)
 		}
+
+		data = strings.TrimPrefix(data, "data: ")
+		data = strings.TrimSuffix(data, "\"")
+
 		var geminiResponse ChatResponse
 		err := json.Unmarshal([]byte(data), &geminiResponse)
 		if err != nil {
@@ -588,7 +589,7 @@ func Handler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relaymodel.
 		}, nil
 	}
 	fullTextResponse := responseGeminiChat2OpenAI(&geminiResponse, meta)
-	fullTextResponse.Model = meta.ActualModelName
+	fullTextResponse.Model = meta.OriginModelName
 	var usage relaymodel.Usage
 	if geminiResponse.UsageMetadata != nil {
 		usage = relaymodel.Usage{
@@ -599,7 +600,7 @@ func Handler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*relaymodel.
 		}
 	} else {
 		responseText, reasoningContent := geminiResponse.GetResponseText(meta)
-		completionTokens := openai.CountTokenText((responseText + reasoningContent), meta.ActualModelName)
+		completionTokens := openai.CountTokenText((responseText + reasoningContent), meta.OriginModelName)
 		usage = relaymodel.Usage{
 			PromptTokens:     meta.PromptTokens,
 			CompletionTokens: completionTokens,

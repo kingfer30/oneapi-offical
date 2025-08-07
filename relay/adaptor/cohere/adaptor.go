@@ -15,7 +15,7 @@ import (
 type Adaptor struct{}
 
 // ConvertImageRequest implements adaptor.Adaptor.
-func (*Adaptor) ConvertImageRequest(request *model.ImageRequest) (any, error) {
+func (*Adaptor) ConvertImageRequest(c *gin.Context, request *model.ImageRequest) (any, error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -58,7 +58,6 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 func (a *Adaptor) GetModelList() []string {
 	return ModelList
 }
-
 func (a *Adaptor) GetChannelName() string {
 	return "Cohere"
 }

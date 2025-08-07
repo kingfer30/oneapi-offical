@@ -49,6 +49,7 @@ type Meta struct {
 	isFirstResponse   bool
 	StartTime         time.Time
 	FirstResponseTime time.Time
+	Provider    string
 }
 
 func GetByContext(c *gin.Context) *Meta {

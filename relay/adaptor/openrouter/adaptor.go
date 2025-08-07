@@ -1,45 +1,36 @@
-package anthropic
+package openrouter
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/relay/adaptor"
+	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
+	"github.com/songquanpeng/one-api/relay/relaymode"
 )
 
 type Adaptor struct {
+	ChannelType int
 }
 
 func (a *Adaptor) Init(meta *meta.Meta) {
-
+	a.ChannelType = meta.ChannelType
 }
 
 func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
-	return fmt.Sprintf("%s/v1/messages", meta.BaseURL), nil
+	return fmt.Sprintf("%s%s", meta.BaseURL, meta.RequestURLPath), nil
 }
 
 func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Request, meta *meta.Meta) error {
 	adaptor.SetupCommonRequestHeader(c, req, meta)
-	req.Header.Set("x-api-key", meta.APIKey)
-	anthropicVersion := c.Request.Header.Get("anthropic-version")
-	if anthropicVersion == "" {
-		anthropicVersion = "2023-06-01"
-	}
-	req.Header.Set("anthropic-version", anthropicVersion)
-	req.Header.Set("anthropic-beta", "messages-2023-12-15")
-
-	// https://x.com/alexalbert__/status/1812921642143900036
-	// claude-3-5-sonnet can support 8k context
-	if strings.HasPrefix(meta.ActualModelName, "claude-3-5-sonnet") {
-		req.Header.Set("anthropic-beta", "max-tokens-3-5-sonnet-2024-07-15")
-	}
-
+	req.Header.Set("Authorization", "Bearer "+meta.APIKey)
 	return nil
 }
 
@@ -47,20 +38,15 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	if request == nil {
 		return nil, errors.New("request is nil")
 	}
-	if request.Thinking != nil && request.Thinking.Type == "enabled" && request.Thinking.IncludeThinking {
-		c.Set("include_think", true)
-		if request.Thinking != nil && request.Thinking.Type == "enabled" && request.Thinking.ThinkingTag != nil {
-			c.Set("thinking_tag_start", request.Thinking.ThinkingTag.Start)
-			c.Set("thinking_tag_end", request.Thinking.ThinkingTag.End)
-			if request.Thinking.ThinkingTag.BlockTag {
-				c.Set("thinking_tag_block", true)
-			}
-		} else {
-			c.Set("thinking_tag_start", "<think>")
-			c.Set("thinking_tag_end", "</think>")
+	newRequest, err := ConvertRequest(c, *request)
+	if err != nil {
+		b, jerr := json.Marshal(newRequest)
+		if jerr == nil {
+			logger.SysErrorf("ConvertRequest error : %s\n, %s", err.Error(), string(b))
 		}
+		return nil, err
 	}
-	return ConvertRequest(*request), nil
+	return newRequest, nil
 }
 
 func (a *Adaptor) ConvertImageRequest(c *gin.Context, request *model.ImageRequest) (any, error) {
@@ -87,10 +73,28 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 	if c.GetBool("thinking_tag_block") {
 		meta.EnableBlockTag = true
 	}
+	if c.GetString("provider") != "" {
+		meta.Provider = c.GetString("provider")
+	}
 	if meta.IsStream {
-		err, usage = StreamHandler(c, resp, meta)
+		var responseText string
+		err, responseText, usage = StreamHandler(c, resp, meta)
+		if usage == nil || usage.TotalTokens == 0 {
+			usage = openai.ResponseText2Usage(responseText, meta.OriginModelName, meta.PromptTokens)
+		}
+		if usage.TotalTokens != 0 && usage.PromptTokens == 0 { // some channels don't return prompt tokens & completion tokens
+			usage.PromptTokens = meta.PromptTokens
+			usage.CompletionTokens = usage.TotalTokens - meta.PromptTokens
+		}
 	} else {
-		err, usage = Handler(c, resp, meta.PromptTokens, meta)
+		switch meta.Mode {
+		case relaymode.ImagesGenerations:
+			fallthrough
+		case relaymode.ImagesEdit:
+			err, usage = ImageHandler(c, resp)
+		default:
+			err, usage = Handler(c, resp, meta.PromptTokens, meta)
+		}
 	}
 	return
 }
@@ -98,8 +102,9 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 func (a *Adaptor) GetModelList() []string {
 	return ModelList
 }
+
 func (a *Adaptor) GetChannelName() string {
-	return "anthropic"
+	return "openrouter"
 }
 
 func (a *Adaptor) ConvertVideoRequest(c *gin.Context, request *model.VideoRequest) (any, error) {

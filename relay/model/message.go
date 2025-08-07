@@ -4,6 +4,7 @@ type Message struct {
 	Role             string  `json:"role,omitempty"`
 	Content          any     `json:"content,omitempty"`
 	ReasoningContent *string `json:"reasoning_content,omitempty"`
+	Reasoning        string  `json:"reasoning,omitempty"`
 	Name             *string `json:"name,omitempty"`
 	ToolCalls        []Tool  `json:"tool_calls,omitempty"`
 	ToolCallId       string  `json:"tool_call_id,omitempty"`

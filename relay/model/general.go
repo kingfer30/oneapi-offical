@@ -88,6 +88,8 @@ type GeneralOpenAIRequest struct {
 	Instruction string    `json:"instruction,omitempty"`
 	NumCtx      int       `json:"num_ctx,omitempty"`
 	Thinking    *Thinking `json:"thinking,omitempty"`
+	Provider    any       `json:"provider,omitempty"`
+	Reasoning    any       `json:"reasoning,omitempty"`
 }
 
 func (r GeneralOpenAIRequest) ParseInput() []string {
