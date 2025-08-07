@@ -81,10 +81,11 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model
 	common.SetEventStreamHeaders(c)
 	var responseText string
 
+	debugText := ""
 	for scanner.Scan() {
 		adaptor.StartingStream(c, meta)
 		data := scanner.Text()
-
+		debugText += data + "----\n"
 		if config.DebugEnabled {
 			logger.SysLogf("Body: %s", data)
 		}
@@ -116,6 +117,9 @@ func StreamHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model
 		if streamResponse.Usage != nil {
 			usage = streamResponse.Usage
 			response.Usage = streamResponse.Usage
+			if usage.CompletionTokens == 0 {
+				logger.SysLogf("CompletionTokens is zero: %s", debugText)
+			}
 		}
 
 		render.ObjectData(c, response)
