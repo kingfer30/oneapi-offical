@@ -144,6 +144,9 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 	// So the HTTPClient will be confused by the response.
 	// For example, Postman will report error, and we cannot check the response at all.
 	for k, v := range resp.Header {
+		if k == "Content-Length" {
+			continue
+		}
 		c.Writer.Header().Set(k, v[0])
 	}
 	c.Writer.WriteHeader(resp.StatusCode)
