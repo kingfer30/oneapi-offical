@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/random"
+	"github.com/songquanpeng/one-api/relay/channeltype"
 )
 
 var (
@@ -191,6 +193,22 @@ func InitChannelCacheByMem() {
 		channel.SleepModels = make(map[string]int64)
 		if *channel.BaseURL != "" {
 			config.ChannelBaseUrlList[channel.Id] = *channel.BaseURL
+		} else {
+			//其他的走默认官方渠道, 这里只针对想屏蔽的渠道做缓存
+			if channel.Type == channeltype.OpenRouter {
+				sourceUrl := channeltype.ChannelBaseURLs[channel.Type]
+				if sourceUrl != "" {
+					// 解析URL
+					u, err := url.Parse(sourceUrl)
+					if err == nil {
+						// 提取主机名（可能包含端口）
+						host := u.Hostname()
+						if host != "" {
+							config.ChannelBaseUrlList[channel.Id] = host
+						}
+					}
+				}
+			}
 		}
 	}
 	var abilities []*Ability

@@ -13,6 +13,11 @@ var ModelList = []string{
 	"claude-opus-4-20250514",
 	"claude-sonnet-4-20250514",
 	"claude-opus-4-1-20250805",
+	"gpt-5-mini",
+	"gpt-5-mini-2025-08-07",
+	"gpt-5-nano",
+	"gpt-5-nano-2025-08-07",
+	"gpt-5-chat-latest",
 }
 
 var ModelMappingList = map[string]string{
@@ -27,4 +32,9 @@ var ModelMappingList = map[string]string{
 	"claude-opus-4-20250514":     "anthropic/claude-opus-4",
 	"claude-sonnet-4-20250514":   "anthropic/claude-sonnet-4",
 	"claude-opus-4-1-20250805":   "anthropic/claude-opus-4.1",
+	"gpt-5-mini":                 "openai/gpt-5-mini",
+	"gpt-5-mini-2025-08-07":      "openai/gpt-5-mini",
+	"gpt-5-nano":                 "openai/gpt-5-nano",
+	"gpt-5-nano-2025-08-07":      "openai/gpt-5-nano",
+	"gpt-5-chat-latest":          "openai/gpt-5-chat",
 }

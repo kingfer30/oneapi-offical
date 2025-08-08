@@ -33,10 +33,15 @@ func RenderMessage(msg string, id string) string {
 			//3. 消息脱敏
 			pattern := `".+?"\s*:\s*dial tcp\s+[\d\.]+:\d+`
 			re := regexp.MustCompile(pattern)
-			msg = re.ReplaceAllString(msg, "URL")
+			msg = re.ReplaceAllString(msg, "our site")
+
 			pattern = `".+?"\s*:\s*`
 			re = regexp.MustCompile(pattern)
-			msg = re.ReplaceAllString(msg, "URL")
+			msg = re.ReplaceAllString(msg, "our site")
+
+			pattern = `(https?:\/\/)?[\w.-]+(:\d+)?\/[\S]*`
+			re = regexp.MustCompile(pattern)
+			msg = re.ReplaceAllString(msg, "our site")
 		}
 	}
 	return msg
