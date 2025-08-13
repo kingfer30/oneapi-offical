@@ -153,6 +153,15 @@ func SaveMediaByUrl(url string) (error, string, string) {
 	if contentType == "audio/x-wav" {
 		contentType = "audio/wav"
 	}
+	if strings.Contains(contentType, "octet-stream") {
+		switch extension {
+		case ".mp4":
+			contentType = "video/mp4"
+		case ".mp3":
+			contentType = "audio/mp3"
+		}
+
+	}
 
 	// 创建临时文件
 	// 判断文件夹是否存在
