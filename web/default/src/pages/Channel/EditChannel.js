@@ -274,7 +274,7 @@ const EditChannel = () => {
       case 1:
         //OpenAI
         newArr=basicModels.filter(function (v, i) {
-          return v.startsWith("gpt-4") || v.startsWith("dall-e-3") || v.startsWith("gpt-4") || v.startsWith("o1") || v.startsWith("o3") || v.startsWith("o4") || v.startsWith("gpt-image")
+          return v.startsWith("gpt-5") || v.startsWith("gpt-4") || v.startsWith("dall-e-3") || v.startsWith("gpt-4") || v.startsWith("o1") || v.startsWith("o3") || v.startsWith("o4") || v.startsWith("gpt-image")
         })
         break;
       case 14:
