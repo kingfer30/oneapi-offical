@@ -85,7 +85,7 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 		for _, tool := range textRequest.Tools {
 			if tool.Type == "google_search_tool" {
 				tools = append(tools, ChatTools{
-					GoogleSearch: GoogleSearch{},
+					GoogleSearch: &GoogleSearch{},
 				})
 				continue
 			}
