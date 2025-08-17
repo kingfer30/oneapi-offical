@@ -23,7 +23,10 @@ func ShouldDisableChannel(err *model.Error, statusCode int, channelId int, chann
 		return false
 	}
 	if statusCode == http.StatusUnauthorized {
-		return true
+		//自定义渠道在下面返回错误, 不在这里直接禁用
+		if channelType != channeltype.Custom {
+			return true
+		}
 	}
 	switch err.Type {
 	case "insufficient_quota", "authentication_error", "permission_error", "forbidden":
@@ -44,6 +47,7 @@ func ShouldDisableChannel(err *model.Error, statusCode int, channelId int, chann
 		strings.Contains(lowerMessage, "permission denied") ||
 		strings.Contains(lowerMessage, "organization has been restricted") || // groq
 		strings.Contains(lowerMessage, "已欠费") ||
+		strings.Contains(lowerMessage, "无效的令牌") || //中转
 		strings.Contains(lowerMessage, "quota exceeded for quota metric 'generate content api requests per minute'") || // gemini
 		strings.Contains(lowerMessage, "api key not found. please pass a valid api key") || // gemini
 		strings.Contains(lowerMessage, "api key expired. please renew the api key") || // gemini
