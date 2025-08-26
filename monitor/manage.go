@@ -86,6 +86,9 @@ func ShouldDelFile(c *gin.Context, err *model.Error) bool {
 
 func ShouldSleepChannel(channelType int, err *model.Error, statusCode int) bool {
 	lowerMessage := strings.ToLower(err.Message)
+	if channelType == channeltype.Custom {
+		return false
+	}
 	if strings.Contains(lowerMessage, "resource has been exhauste") ||
 		(strings.Contains(lowerMessage, "you exceeded your current quota") && channelType == channeltype.Gemini) ||
 		strings.Contains(lowerMessage, "e.g. check quota") {
