@@ -200,47 +200,53 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 			var geminiErr *GeminiErrorResponse
 			err = json.Unmarshal(requestBody, &geminiErr)
 			if err == nil && len(geminiErr.Error.Details) > 0 {
-				delay := 60
-				re := regexp.MustCompile(`\d+`)
-				for _, detail := range geminiErr.Error.Details {
-					if len(detail.ErrorViolations) > 0 {
-						isEnd := false
-						for _, violat := range detail.ErrorViolations {
-							if strings.Contains(violat.QuotaId, "RequestsPerDay") {
-								num := re.FindString(violat.QuotaValue)
-								tms, _ := strconv.Atoi(num)
-								if tms > 0 {
-									delay = 24 * 3600 / tms
-									isEnd = true
-									break
+				logger.SysLogf("errBody :%s", string(requestBody))
+				if !strings.Contains(strings.ToLower(geminiErr.Error.Message), "quota exceeded for quota metric 'generate content api requests per minute'") && // gemini
+					!strings.Contains(strings.ToLower(geminiErr.Error.Message), "permission denied: consumer 'api_key:ai") {
+					delay := 60
+					re := regexp.MustCompile(`\d+`)
+					for _, detail := range geminiErr.Error.Details {
+						if len(detail.ErrorViolations) > 0 {
+							isEnd := false
+							for _, violat := range detail.ErrorViolations {
+								if strings.Contains(violat.QuotaId, "RequestsPerDay") {
+									num := re.FindString(violat.QuotaValue)
+									tms, _ := strconv.Atoi(num)
+									if tms > 0 {
+										delay = 24 * 3600 / tms
+										isEnd = true
+										break
+									}
 								}
 							}
+							if isEnd {
+								break
+							}
 						}
-						if isEnd {
+						if detail.RetryDelay != "" {
+							num := re.FindString(detail.RetryDelay)
+							delay, _ = strconv.Atoi(num)
+							if delay >= 0 {
+								delay = 60
+							}
 							break
 						}
 					}
-					if detail.RetryDelay != "" {
-						num := re.FindString(detail.RetryDelay)
-						delay, _ = strconv.Atoi(num)
-						if delay >= 0 {
-							delay = 60
-						}
-						break
+					openaiErr := openai.ErrorWrapper(
+						fmt.Errorf("Guo - Resource has been exhausted"),
+						"too_many_requests",
+						http.StatusTooManyRequests,
+					)
+					errData, err := json.Marshal(openaiErr)
+					if err == nil {
+						resp.Body = io.NopCloser(bytes.NewBuffer(errData))
+					} else {
+						resp.Body = io.NopCloser(bytes.NewBuffer(requestBody))
 					}
-				}
-				openaiErr := openai.ErrorWrapper(
-					fmt.Errorf("Guo - Resource has been exhausted"),
-					"too_many_requests",
-					http.StatusTooManyRequests,
-				)
-				errData, err := json.Marshal(openaiErr)
-				if err == nil {
-					resp.Body = io.NopCloser(bytes.NewBuffer(errData))
+					c.Set("gemini_delay", delay)
 				} else {
 					resp.Body = io.NopCloser(bytes.NewBuffer(requestBody))
 				}
-				c.Set("gemini_delay", delay)
 			} else {
 				resp.Body = io.NopCloser(bytes.NewBuffer(requestBody))
 			}

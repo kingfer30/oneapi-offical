@@ -38,6 +38,7 @@ var ModelList = []string{
 	"gemini-2.0-pro-exp",
 	"gemini-2.0-flash-exp-image-generation",
 	"gemini-2.0-flash-preview-image-generation",
+	"gemini-2.5-flash-image-preview",
 	"gemma-3-27b-it",
 	"gemini-embedding-exp-03-07",
 	"gemini-embedding-exp",
@@ -61,6 +62,7 @@ var ModelList = []string{
 
 //定义支持画图的模型
 var ImageModelList = []string{
+	"gemini-2.5-flash-image-preview",
 	"gemini-2.0-flash-exp-image-generation",
 	"gemini-2.0-flash-exp",
 }
@@ -83,6 +85,8 @@ var ThinkingModelList = []string{
 	"gemini-2.5-flash-preview-04-17-thinking",
 	"gemini-2.5-flash-preview-05-20",
 	"gemini-2.5-pro-preview-05-06",
+	"gemini-2.5-flash",
+	"gemini-2.5-pro",
 }
 
 var BlockReasonList = map[string]string{
