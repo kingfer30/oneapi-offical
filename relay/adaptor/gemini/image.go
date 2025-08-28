@@ -32,18 +32,9 @@ func ConvertImageRequest(c *gin.Context, request relaymodel.ImageRequest) (*Imag
 		for _, img := range request.Image {
 			//图片编辑
 			mimeType, fileData, err := image.GetImageFromUrl(img, false)
-			// mimeType, fileName, err := image.GetImageFromUrl(img, true)
-			// mimeType, fileData, err := FileHandler(c, img, img, mimeType, fileName)
-
 			if err != nil {
 				return nil, err
 			}
-			// parts = append(parts, Part{
-			// 	FileData: &FileData{
-			// 		MimeType: mimeType,
-			// 		Uri:      fileData,
-			// 	},
-			// })
 			parts = append(parts, Part{
 				InlineData: &InlineData{
 					MimeType: mimeType,
@@ -257,10 +248,6 @@ func ImageHandler(c *gin.Context, resp *http.Response, meta *meta.Meta) (*model.
 	if err != nil {
 		return openai.ErrorWrapper(err, "unmarshal_response_body_failed", http.StatusInternalServerError), nil
 	}
-
-	// if config.DebugEnabled {
-	// 	logger.SysLogf("Body: %s", string(responseBody))
-	// }
 
 	if len(geminiResponse.Candidates) == 0 {
 		return &relaymodel.ErrorWithStatusCode{

@@ -81,6 +81,7 @@ func getImageRequest(c *gin.Context, _ int) (*relaymodel.ImageRequest, error) {
 				}
 				imageRequest.Image = append(imageRequest.Image, encodedBuilder.String())
 			}
+			imageRequest.N = len(imageRequest.Image)
 		}
 
 	}
@@ -333,6 +334,12 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 			if meta.ChannelType == channeltype.Gemini {
 				//gemini按照正常chat计费
 				quota = int64(math.Ceil((float64(prompt) + float64(completion)*completionRatio) * ratio))
+				//一些特殊模型的计费
+				switch imageRequest.Model {
+				case "imagen-3.0-generate-002":
+					//0.03/per images
+					quota = int64(modelRatio * float64(imageRequest.N) * groupRatio)
+				}
 			}
 			if imageRequest.Model == "gpt-image-1" {
 				prompt = usage.InputTokens
@@ -354,7 +361,7 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		}
 		if quota != 0 {
 			tokenName := c.GetString(ctxkey.TokenName)
-			logContent := fmt.Sprintf("model rate %.2f, size radio %.2f, group rate %.2f (%s-%s)", modelRatio, imageCostRatio, groupRatio, imageRequest.Size, imageMode)
+			logContent := fmt.Sprintf("model rate %.2f, size radio %.2f, group rate %.2f (%s-%s-%d)", modelRatio, imageCostRatio, groupRatio, imageRequest.Size, imageMode, imageRequest.N)
 			model.RecordConsumeLog(c, meta.IsStream, meta.FirstResponseTime, int(useTimeSeconds), meta.UserId, meta.ChannelId, prompt, completion, imageRequest.Model, tokenName, quota, logContent, meta.TokenId)
 			model.UpdateUserUsedQuotaAndRequestCount(meta.UserId, quota)
 			channelId := c.GetInt(ctxkey.ChannelId)
