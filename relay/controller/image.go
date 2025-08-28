@@ -331,7 +331,7 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		if usage != nil {
 			prompt = usage.PromptTokens
 			completion = usage.CompletionTokens
-			if meta.ChannelType == channeltype.Gemini {
+			if meta.ChannelType == channeltype.Gemini || strings.HasPrefix(imageRequest.Model, "gemini-") {
 				//gemini按照正常chat计费
 				quota = int64(math.Ceil((float64(prompt) + float64(completion)*completionRatio) * ratio))
 				//一些特殊模型的计费
