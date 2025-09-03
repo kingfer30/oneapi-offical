@@ -76,7 +76,7 @@ func FileHandler(c *gin.Context, fieldUrl string, url string, contentType string
 	// defer os.Remove(fileName) // 确保在程序结束时删除临时文件
 
 	//5. 循环获取文件上传状态
-	retryNum := 10
+	retryNum := 45
 	for file.State == genai.FileStateProcessing {
 		if retryNum <= 0 {
 			return "", "", fmt.Errorf("Error: getting file state but timeout")
