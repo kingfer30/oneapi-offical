@@ -13,6 +13,7 @@ import (
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
+	"github.com/songquanpeng/one-api/relay/apitype"
 	billingratio "github.com/songquanpeng/one-api/relay/billing/ratio"
 	"github.com/songquanpeng/one-api/relay/meta"
 	relaymodel "github.com/songquanpeng/one-api/relay/model"
@@ -99,6 +100,10 @@ func PostConsumeQuota(ctx *gin.Context, usage *relaymodel.Usage, meta *meta.Meta
 	completionTokens := usage.CompletionTokens
 	if completionTokens == 0 && usage.OutputTokens > 0 {
 		completionTokens = usage.OutputTokens
+	}
+	if meta.APIType == apitype.Gemini {
+		//gemini需要加上思考token
+		completionTokens += usage.ThoughtsTokens
 	}
 	quota = int64(math.Ceil((float64(promptTokens) + float64(completionTokens)*completionRatio) * ratio))
 	if ratio != 0 && quota <= 0 {
