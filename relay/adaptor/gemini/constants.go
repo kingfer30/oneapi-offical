@@ -100,7 +100,7 @@ var BlockReasonList = map[string]string{
 
 func IsImageModel(name string) bool {
 	for _, model := range ImageModelList {
-		if strings.Contains(name, model) {
+		if name == model {
 			return true
 		}
 	}
@@ -109,7 +109,7 @@ func IsImageModel(name string) bool {
 
 func IsLowTpmModel(name string) bool {
 	for _, model := range LowTPMModelList {
-		if strings.Contains(name, model) {
+		if name == model {
 			return true
 		}
 	}
@@ -118,7 +118,7 @@ func IsLowTpmModel(name string) bool {
 
 func IsThinkingModel(name string) bool {
 	for _, model := range ThinkingModelList {
-		if strings.Contains(name, model) {
+		if name == model {
 			return true
 		}
 	}
