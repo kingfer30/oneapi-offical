@@ -156,6 +156,9 @@ func SaveMediaByUrl(url string) (error, string, string) {
 	if contentType == "audio/x-flac" {
 		contentType = "audio/flac"
 	}
+	if contentType == "video/x-msvideo" {
+		contentType = "video/avi"
+	}
 	if strings.Contains(contentType, "octet-stream") {
 		switch extension {
 		case ".mp4":
