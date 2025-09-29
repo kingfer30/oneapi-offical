@@ -54,12 +54,12 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 		thinkingConfig := &ThinkingConfig{
 			IncludeThoughts: true,
 		}
-		if textRequest.Thinking != nil && textRequest.Thinking.Type == "enabled" {
-			if textRequest.Thinking.ThinkingBudget > 0 {
-				thinkingConfig.ThinkingBudget = &textRequest.Thinking.ThinkingBudget
-			}
-		} else if textRequest.Thinking != nil && textRequest.Thinking.Type != "enabled" {
+		if textRequest.Thinking != nil && textRequest.Thinking.Type != "enabled" {
 			thinkingConfig.IncludeThoughts = false
+			zero := 0
+			thinkingConfig.ThinkingBudget = &zero
+		} else {
+			thinkingConfig.ThinkingBudget = &textRequest.Thinking.ThinkingBudget
 		}
 		generationConfig.ThinkingConfig = thinkingConfig
 	}
