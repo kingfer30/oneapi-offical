@@ -59,7 +59,9 @@ func ConvertRequest(c *gin.Context, textRequest relaymodel.GeneralOpenAIRequest)
 			zero := 0
 			thinkingConfig.ThinkingBudget = &zero
 		} else {
-			thinkingConfig.ThinkingBudget = &textRequest.Thinking.ThinkingBudget
+			if textRequest.Thinking != nil {
+				thinkingConfig.ThinkingBudget = &textRequest.Thinking.ThinkingBudget
+			}
 		}
 		generationConfig.ThinkingConfig = thinkingConfig
 	}
