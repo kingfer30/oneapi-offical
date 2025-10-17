@@ -23,6 +23,7 @@ import (
 	"github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/monitor"
 	relay "github.com/songquanpeng/one-api/relay"
+	"github.com/songquanpeng/one-api/relay/apitype"
 	"github.com/songquanpeng/one-api/relay/channeltype"
 	"github.com/songquanpeng/one-api/relay/controller"
 	"github.com/songquanpeng/one-api/relay/meta"
@@ -80,6 +81,9 @@ func testChannel(channel *model.Channel, request *relaymodel.GeneralOpenAIReques
 	}
 	if modelMap != nil && modelMap[modelName] != "" {
 		modelName = modelMap[modelName]
+	}
+	if meta.APIType == apitype.Gemini {
+		modelName = "gemini-2.5-flash"
 	}
 	meta.OriginModelName, meta.ActualModelName = request.Model, modelName
 	request.Model = modelName
