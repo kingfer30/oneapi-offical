@@ -190,7 +190,7 @@ func InitChannelCacheByMem() {
 		config.ChannelBaseUrlList = make(map[int]string)
 	}
 	for _, channel := range channels {
-		channel.SleepModels = make(map[string]int64)
+		channel.SleepModels = make(map[string]*SleepInfo)
 		if *channel.BaseURL != "" {
 			config.ChannelBaseUrlList[channel.Id] = *channel.BaseURL
 		} else {
@@ -272,11 +272,13 @@ func CacheGetRandomSatisfiedChannel(group string, model string, ignoreFirstPrior
 
 	// 过滤掉被禁用当前模型的渠道
 	var validChannels []*Channel
+	currentTime := helper.GetTimestamp()
 	for _, ch := range channels {
 		ch.SleepLock.RLock()
-		wakeupAt := ch.SleepModels[model]
+		sleepInfo := ch.SleepModels[model]
 		ch.SleepLock.RUnlock()
-		if wakeupAt == 0 {
+		// 如果没有休眠记录，或者休眠时间为0（已唤醒），或者已经到达唤醒时间，则可用
+		if sleepInfo == nil || sleepInfo.AwakeTime == 0 || sleepInfo.AwakeTime <= currentTime {
 			validChannels = append(validChannels, ch)
 		}
 	}
@@ -307,16 +309,42 @@ func CacheGetRandomSatisfiedChannel(group string, model string, ignoreFirstPrior
 }
 
 // 新版锁定模型
-func SleepChannel(group string, model string, channelId int, awakeTime int64) {
+func SleepChannel(channelType int, group string, model string, channelId int, awakeTime int64) {
 	channelSyncLock.RLock()
 	defer channelSyncLock.RUnlock()
 	channels := group2model2channels[group][model]
 	for _, channel := range channels {
 		if channel.Id == channelId {
 			channel.SleepLock.Lock()
-			channel.SleepModels[model] = awakeTime
+			// 初始化SleepModels map（如果为nil）
+			if channel.SleepModels == nil {
+				channel.SleepModels = make(map[string]*SleepInfo)
+			}
+
+			// 获取或创建SleepInfo
+			sleepInfo := channel.SleepModels[model]
+			if sleepInfo == nil {
+				sleepInfo = &SleepInfo{
+					AwakeTime:  awakeTime,
+					SleepCount: 1,
+				}
+				channel.SleepModels[model] = sleepInfo
+			} else {
+				// 更新休眠时间和休眠次数
+				sleepInfo.AwakeTime = awakeTime
+				sleepInfo.SleepCount++
+			}
+
 			channel.SleepLock.Unlock()
-			logger.SysLogf("渠道 - [%s(%d)] , model - [%s] 已休眠至 %d", channel.Name, channel.Id, model, awakeTime)
+
+			logger.SysLogf("渠道 - [%s(%d)] , model - [%s] 已休眠至 %d, 已休眠次数: %d", channel.Name, channel.Id, model, awakeTime, sleepInfo.SleepCount)
+			// 当gemini渠道休眠次数达到10次时，禁用渠道
+			if sleepInfo.SleepCount >= 10 && channelType == channeltype.Gemini {
+				channel.Status = 2 // 状态设置为2（禁用）
+				// 这里应该调用数据库更新方法，例如：
+				logger.SysLogf("渠道 - [%s(%d)] , model - [%s] 已10次触发429错误, 开始自动禁用", channel.Name, channel.Id, model)
+				DisableChannel(channel.Id, channel.Name, "当前渠道已10次触发429错误")
+			}
 			break
 		}
 	}
@@ -338,8 +366,8 @@ func WakeupChannel(frequency int) {
 				for model, channels := range models {
 					for _, channel := range channels {
 						if len(channel.SleepModels) > 0 {
-							for sm, awakeTime := range channel.SleepModels {
-								if sm == model && awakeTime <= helper.GetTimestamp() {
+							for sm, sleepInfo := range channel.SleepModels {
+								if sm == model && sleepInfo.AwakeTime <= helper.GetTimestamp() {
 									tasks = append(tasks, struct {
 										channel *Channel
 										model   string
@@ -358,9 +386,12 @@ func WakeupChannel(frequency int) {
 		channelSyncLock.Lock()
 		for _, task := range tasks {
 			task.channel.SleepLock.Lock()
-			delete(task.channel.SleepModels, task.model)
+			// 唤醒时不删除记录，而是将 AwakeTime 设置为 0，保留 SleepCount 让其继续累积
+			if sleepInfo, ok := task.channel.SleepModels[task.model]; ok {
+				sleepInfo.AwakeTime = 0
+				logger.SysLogf("渠道 - [%s(%d)] , model - [%s] 已唤醒，当前累积休眠次数: %d", task.channel.Name, task.channel.Id, task.model, sleepInfo.SleepCount)
+			}
 			task.channel.SleepLock.Unlock()
-			logger.SysLogf("渠道 - [%s(%d)] , model - [%s] 已唤醒", task.channel.Name, task.channel.Id, task.model)
 		}
 		channelSyncLock.Unlock()
 		logger.SysLog("wakeup channel end")
@@ -406,7 +437,7 @@ func SyncCloseSoftLimitChannel(frequency int) {
 		}
 		for _, channel := range channels {
 			reason := fmt.Sprintf("当前渠道触发软限制自动停止，软限制使用量: %f，已使用: %f", float64(channel.SoftLimitUsd/500000), float64(channel.UsedQuota/500000))
-			DisableChannel(channel.Id, ChannelStatusManuallyDisabled, channel.Name, reason)
+			DisableChannel(channel.Id, channel.Name, reason)
 
 			logger.SysLogf("【%s(%d)】%s", channel.Name, channel.Id, reason)
 		}

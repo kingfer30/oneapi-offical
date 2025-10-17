@@ -16,8 +16,8 @@ func syncUpdateChannel() {
 		model.InitChannelCache()
 	}()
 }
-func SleepChannel(group string, modelName string, channelId int, awakeTime int64) {
-	model.SleepChannel(group, modelName, channelId, awakeTime)
+func SleepChannel(channelType int, group string, modelName string, channelId int, awakeTime int64) {
+	model.SleepChannel(channelType, group, modelName, channelId, awakeTime)
 }
 func WakeupChannel(frequency int) {
 	model.WakeupChannel(frequency)

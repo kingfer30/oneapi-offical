@@ -24,6 +24,12 @@ const (
 	ChannelStatusUnActivate       = 5
 )
 
+// SleepInfo 记录模型的休眠信息
+type SleepInfo struct {
+	AwakeTime  int64 // 唤醒时间
+	SleepCount int   // 休眠次数，默认0
+}
+
 type Channel struct {
 	Id                 int     `json:"id"`
 	Type               int     `json:"type" gorm:"default:0"`
@@ -54,8 +60,8 @@ type Channel struct {
 	CalcPrompt         *bool   `json:"calc_prompt" gorm:"default:1"`
 
 	// 新增字段，记录被禁用的模型
-	SleepModels map[string]int64 `gorm:"-"` // 标记为忽略数据库
-	SleepLock   sync.RWMutex     `gorm:"-"` // 锁也不需要持久化
+	SleepModels map[string]*SleepInfo `gorm:"-"` // 标记为忽略数据库
+	SleepLock   sync.RWMutex          `gorm:"-"` // 锁也不需要持久化
 }
 
 func GetAllChannels(startIdx int, num int, scope string) ([]*Channel, error) {
@@ -364,8 +370,8 @@ func UpdateChannelsAbilities() (any, error) {
 }
 
 // disable & notify
-func DisableChannel(channelId int, status int, channelName string, reason string) {
-	UpdateChannelStatusById(channelId, status)
+func DisableChannel(channelId int, channelName string, reason string) {
+	UpdateChannelStatusById(channelId, ChannelStatusManuallyDisabled)
 
 	//通知与缓存更新改为异步, 防止卡死
 	go func() {

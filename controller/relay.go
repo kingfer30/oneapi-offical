@@ -142,9 +142,9 @@ func processChannelRelayError(c *gin.Context, userId int, channelId int, channel
 			awakeTime = helper.GetTimestamp() + int64(delay)
 		}
 		if awakeTime == 0 {
-			awakeTime = helper.GetTimestamp() + 60
+			awakeTime = helper.GetTimestamp() + 600
 		}
-		monitor.SleepChannel(group, modelName, channelId, awakeTime)
+		monitor.SleepChannel(channelType, group, modelName, channelId, awakeTime)
 	}
 	if monitor.ShouldDelFile(c, &err.Error) {
 		fileUri := c.GetString("FileUri")
