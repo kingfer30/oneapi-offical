@@ -71,6 +71,11 @@ func ShouldDisableChannel(err *model.Error, statusCode int, channelId int, chann
 
 		return true
 	}
+
+	//gemini的429错误处理
+	if statusCode == -1 && channelType == channeltype.Gemini && strings.Contains(lowerMessage, "you exceeded your current quota") {
+		return true
+	}
 	return false
 }
 
